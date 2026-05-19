@@ -1,0 +1,311 @@
+import { clearAccessToken, getAccessToken, getLoggedInUserId, markSessionExpired } from '@/services/authSession'
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
+
+const isWrappedResponse = (payload) => {
+  if (!payload || typeof payload !== 'object') return false
+  return 'status' in payload && 'message' in payload && 'data' in payload
+}
+
+const unwrapData = (payload) => {
+  if (isWrappedResponse(payload)) return payload.data
+  return payload
+}
+
+const getErrorMessage = (payload, fallback) => {
+  if (!payload) return fallback
+  if (typeof payload === 'string') return payload
+  if (typeof payload === 'object' && typeof payload.message === 'string') return payload.message
+  return fallback
+}
+
+const toAbsoluteUrl = (urlOrPath) => {
+  if (!urlOrPath) return ''
+  if (/^https?:\/\//i.test(urlOrPath)) return urlOrPath
+  const normalized = urlOrPath.startsWith('/') ? urlOrPath : `/${urlOrPath}`
+  return `${API_BASE_URL}${normalized}`
+}
+
+const buildUrl = (path, query = {}) => {
+  const url = new URL(`${API_BASE_URL}${path}`)
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    url.searchParams.set(key, value)
+  })
+  return url.toString()
+}
+
+const withUserUpdate = (payload) => {
+  if (!payload || typeof payload !== 'object') return payload
+
+  const userId = getLoggedInUserId()
+  if (!userId) return payload
+  if (payload.user_update) return payload
+
+  return {
+    ...payload,
+    user_update: userId,
+  }
+}
+
+const withUserUpdateId = (payload) => {
+  if (!payload || typeof payload !== 'object') return payload
+
+  const userId = getLoggedInUserId()
+  if (!userId) return payload
+  if (payload.user_update_id) return payload
+
+  return {
+    ...payload,
+    user_update_id: userId,
+  }
+}
+
+const withUserUpdateQuery = (query = {}) => {
+  const userId = getLoggedInUserId()
+  if (!userId) return query
+  if (query.user_update) return query
+
+  return {
+    ...query,
+    user_update: userId,
+  }
+}
+
+const request = async (path, options = {}) => {
+  const { query, body, isFormData = false, headers = {}, ...rest } = options
+  const token = getAccessToken()
+  const isStringBody = typeof body === 'string'
+
+  const response = await fetch(buildUrl(path, query), {
+    ...rest,
+    headers: {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: body
+      ? isFormData
+        ? body
+        : isStringBody
+          ? body
+          : JSON.stringify(body)
+      : undefined,
+  })
+
+  const rawText = await response.text()
+  let payload = null
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText)
+    } catch {
+      payload = rawText
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      if (token) {
+        clearAccessToken()
+        markSessionExpired()
+      }
+      throw new Error('Sesi login berakhir. Silakan login kembali.')
+    }
+    throw new Error(getErrorMessage(payload, `Request gagal (${response.status})`))
+  }
+
+  return unwrapData(payload)
+}
+
+export const realErpService = {
+  async login(email, password) {
+    const payload = new URLSearchParams({
+      username: String(email ?? '').trim(),
+      password: String(password ?? ''),
+    })
+
+    return request('/auth/login', {
+      method: 'POST',
+      body: payload.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+  },
+
+  async register(payload) {
+    return request('/auth/register', { method: 'POST', body: payload })
+  },
+
+  async getFarmers(search = '') {
+    return request('/farmers', { query: { search } })
+  },
+
+  async getLands(query = {}) {
+    return request('/lands', { query })
+  },
+
+  async createLand(payload) {
+    return request('/lands', {
+      method: 'POST',
+      body: withUserUpdate(payload),
+    })
+  },
+
+  async getLandById(id) {
+    return request(`/lands/${id}`)
+  },
+
+  async updateLand(id, payload) {
+    return request(`/lands/${id}`, {
+      method: 'PUT',
+      body: withUserUpdate(payload),
+    })
+  },
+
+  async deleteLand(id) {
+    return request(`/lands/${id}`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async createPlantingProduction(payload) {
+    return request('/planting-productions', {
+      method: 'POST',
+      body: withUserUpdateId(payload),
+    })
+  },
+
+  async getPlantingProductions(query = {}) {
+    return request('/planting-productions', { query })
+  },
+
+  async getPlantingProductionById(id) {
+    return request(`/planting-productions/${id}`)
+  },
+
+  async updatePlantingProduction(id, payload) {
+    return request(`/planting-productions/${id}`, {
+      method: 'PUT',
+      body: withUserUpdateId(payload),
+    })
+  },
+
+  async deletePlantingProduction(id) {
+    return request(`/planting-productions/${id}`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async createOilProduction(payload) {
+    return request('/oil-productions', {
+      method: 'POST',
+      body: withUserUpdateId(payload),
+    })
+  },
+
+  async getOilProductions(query = {}) {
+    return request('/oil-productions', { query })
+  },
+
+  async getOilProductionById(id) {
+    return request(`/oil-productions/${id}`)
+  },
+
+  async updateOilProduction(id, payload) {
+    return request(`/oil-productions/${id}`, {
+      method: 'PUT',
+      body: withUserUpdateId(payload),
+    })
+  },
+
+  async deleteOilProduction(id) {
+    return request(`/oil-productions/${id}`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async uploadLandPhoto(id, file) {
+    const formData = new FormData()
+    formData.append('foto', file)
+    return request(`/lands/${id}/foto`, {
+      method: 'POST',
+      body: formData,
+      isFormData: true,
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async getFarmerById(id) {
+    return request(`/farmers/${id}`)
+  },
+
+  async createFarmer(payload) {
+    return request('/farmers', { method: 'POST', body: withUserUpdate(payload) })
+  },
+
+  async updateFarmer(id, payload) {
+    return request(`/farmers/${id}`, { method: 'PUT', body: withUserUpdate(payload) })
+  },
+
+  async deleteFarmer(id) {
+    return request(`/farmers/${id}`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async uploadFarmerPhoto(id, file) {
+    const formData = new FormData()
+    formData.append('foto', file)
+    return request(`/farmers/${id}/foto`, {
+      method: 'POST',
+      body: formData,
+      isFormData: true,
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async deleteFarmerPhoto(id) {
+    return request(`/farmers/${id}/foto`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
+
+  async getProvinsi(search = '') {
+    return request('/wilayah/provinsi', { query: { search } })
+  },
+
+  async getKabupatenKota(provinsiKode, search = '') {
+    return request('/wilayah/kabupaten-kota', {
+      query: {
+        provinsi_kode: provinsiKode,
+        search,
+      },
+    })
+  },
+
+  async getKecamatan(kabupatenKotaKode, search = '') {
+    return request('/wilayah/kecamatan', {
+      query: {
+        kabupaten_kota_kode: kabupatenKotaKode,
+        search,
+      },
+    })
+  },
+
+  async getDesaKelurahan(kecamatanKode, search = '') {
+    return request('/wilayah/desa-kelurahan', {
+      query: {
+        kecamatan_kode: kecamatanKode,
+        search,
+      },
+    })
+  },
+}
+
+export { API_BASE_URL, toAbsoluteUrl }

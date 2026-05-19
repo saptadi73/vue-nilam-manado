@@ -1,0 +1,105 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg-main: #082521;
+  --bg-soft: #11332e;
+  --text-soft: #d2f2e9;
+}
+
+* {
+  font-family: "Manrope", sans-serif;
+}
+
+body {
+  background: radial-gradient(circle at 15% 10%, #1f6c5f 0, #0c3029 35%, #071f1b 80%);
+  color: #f2fffb;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.app-bg {
+  background-image:
+    radial-gradient(900px 500px at 90% 0%, rgba(56, 189, 248, 0.15), transparent 70%),
+    radial-gradient(600px 420px at 0% 80%, rgba(34, 197, 94, 0.12), transparent 65%);
+}
+
+.field {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.2);
+  color: #f0fff9;
+  font-size: 0.9rem;
+  outline: none;
+  padding: 0.7rem 0.8rem;
+}
+
+.field::placeholder {
+  color: rgba(224, 247, 239, 0.55);
+}
+
+.field:focus {
+  border-color: rgba(52, 211, 153, 0.75);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.field-invalid {
+  border-color: rgba(248, 113, 113, 0.8);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.field-error {
+  color: #fecaca;
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+}
+
+.btn-primary {
+  border: 0;
+  border-radius: 0.8rem;
+  background: linear-gradient(135deg, #22c55e, #14b8a6);
+  color: #05221d;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn-muted {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e7fff7;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.72rem 1rem;
+}
+
+.icon-action {
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d6fff0;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.55rem 0.8rem;
+  transition: all 0.18s ease;
+}
+
+.icon-action svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+.icon-action:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #ffffff;
+}
