@@ -305,7 +305,13 @@ onMounted(initPage)
 
         <div class="md:col-span-2">
           <p class="mb-2 text-sm text-emerald-100/85">Preview Foto</p>
-          <img :src="currentPhotoUrl" alt="Preview foto petani" class="h-48 w-full rounded-xl border border-white/10 object-cover" />
+          <div class="lg:flex lg:justify-center">
+            <img
+              :src="currentPhotoUrl"
+              alt="Preview foto petani"
+              class="h-48 w-full rounded-xl border border-white/10 object-cover sm:h-56 md:h-64 lg:h-64 lg:w-64 xl:h-72 xl:w-72"
+            />
+          </div>
         </div>
       </div>
 

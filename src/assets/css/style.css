@@ -43,6 +43,16 @@ body {
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
+select option,
+select optgroup {
+  background-color: #9ca3af !important;
+  color: #0f172a !important;
+}
+
+select option:disabled {
+  color: #334155 !important;
+}
+
 .field-invalid {
   border-color: rgba(248, 113, 113, 0.8);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);

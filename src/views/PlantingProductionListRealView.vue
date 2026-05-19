@@ -28,6 +28,17 @@ const farmers = ref([])
 const lands = ref([])
 const detailModalOpen = ref(false)
 const selectedItem = ref(null)
+const noteModalOpen = ref(false)
+const noteSaving = ref(false)
+const noteError = ref('')
+const selectedForNote = ref(null)
+const noteForm = ref({
+  tanggal: new Date().toISOString().slice(0, 10),
+  catatan: '',
+})
+const notesList = ref([])
+const notesLoading = ref(false)
+const editingNote = ref(null)
 
 let searchTimer = null
 
@@ -128,6 +139,123 @@ const openQuickDetail = (item) => {
 const closeQuickDetail = () => {
   detailModalOpen.value = false
   selectedItem.value = null
+}
+
+const parseIsoDate = (value) => {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const date = new Date(`${text}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const getProgressPercent = (item) => {
+  if (String(item?.status ?? '').toLowerCase() === 'selesai') return 100
+
+  const start = parseIsoDate(item?.tanggal_mulai)
+  const end = parseIsoDate(item?.tanggal_akhir)
+  if (!start || !end) return 0
+
+  const duration = end.getTime() - start.getTime()
+  if (duration <= 0) return 0
+
+  const today = new Date()
+  const todayRef = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const progress = ((todayRef - start.getTime()) / duration) * 100
+  return Math.max(0, Math.min(100, Math.round(progress)))
+}
+
+const loadNotes = async (productionId) => {
+  notesLoading.value = true
+  try {
+    const data = await realErpService.getPlantingProductionNotes(productionId)
+    notesList.value = Array.isArray(data) ? data : []
+  } catch {
+    notesList.value = []
+  } finally {
+    notesLoading.value = false
+  }
+}
+
+const openNoteModal = (item) => {
+  selectedForNote.value = item
+  noteModalOpen.value = true
+  noteSaving.value = false
+  noteError.value = ''
+  editingNote.value = null
+  notesList.value = []
+  noteForm.value = {
+    tanggal: new Date().toISOString().slice(0, 10),
+    catatan: '',
+  }
+  loadNotes(item.id)
+}
+
+const closeNoteModal = () => {
+  noteModalOpen.value = false
+  selectedForNote.value = null
+  noteSaving.value = false
+  noteError.value = ''
+  editingNote.value = null
+  notesList.value = []
+}
+
+const startEditNote = (note) => {
+  editingNote.value = note
+  noteForm.value = {
+    tanggal: String(note.tanggal ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+    catatan: note.catatan ?? '',
+  }
+  noteError.value = ''
+}
+
+const cancelEditNote = () => {
+  editingNote.value = null
+  noteForm.value = { tanggal: new Date().toISOString().slice(0, 10), catatan: '' }
+  noteError.value = ''
+}
+
+const deleteNote = async (note) => {
+  if (!selectedForNote.value?.id) return
+  const ok = window.confirm('Hapus catatan ini?')
+  if (!ok) return
+  try {
+    await realErpService.deletePlantingProductionNote(selectedForNote.value.id, note.id)
+    notesList.value = notesList.value.filter((n) => n.id !== note.id)
+    toast.success('Catatan berhasil dihapus.')
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Gagal menghapus catatan.')
+  }
+}
+
+const submitNote = async () => {
+  if (!selectedForNote.value?.id) return
+  if (!String(noteForm.value.catatan ?? '').trim()) {
+    noteError.value = 'Catatan wajib diisi.'
+    return
+  }
+
+  noteSaving.value = true
+  noteError.value = ''
+  try {
+    const payload = {
+      tanggal: noteForm.value.tanggal,
+      catatan: String(noteForm.value.catatan ?? '').trim(),
+    }
+    if (editingNote.value) {
+      await realErpService.updatePlantingProductionNote(selectedForNote.value.id, editingNote.value.id, payload)
+      toast.success('Catatan berhasil diperbarui.')
+    } else {
+      await realErpService.createPlantingProductionNote(selectedForNote.value.id, payload)
+      toast.success(`Catatan untuk ${selectedForNote.value.kode} berhasil ditambahkan.`)
+    }
+    editingNote.value = null
+    noteForm.value = { tanggal: new Date().toISOString().slice(0, 10), catatan: '' }
+    await loadNotes(selectedForNote.value.id)
+  } catch (err) {
+    noteError.value = err instanceof Error ? err.message : 'Gagal menyimpan catatan produksi tanam.'
+  } finally {
+    noteSaving.value = false
+  }
 }
 
 const onOverlayClose = (event) => {
@@ -357,7 +485,32 @@ const exportCsv = () => {
           <p class="rounded-lg bg-black/20 px-3 py-2 sm:col-span-2">Hasil Kering: {{ fmtNumber(item.aktual_hasil_produksi_kering ?? 0) }} kg</p>
         </div>
 
+        <div class="mt-4 space-y-1">
+          <div class="flex items-center justify-between text-xs text-emerald-100/85">
+            <span>Progress Durasi</span>
+            <span>{{ getProgressPercent(item) }}%</span>
+          </div>
+          <div class="h-2 overflow-hidden rounded-full bg-white/10">
+            <div
+              class="h-full rounded-full bg-linear-to-r from-emerald-400 to-cyan-400 transition-all"
+              :style="{ width: `${getProgressPercent(item)}%` }"
+            />
+          </div>
+          <p class="text-[11px] text-emerald-100/70">Perhitungan: tanggal mulai - hari ini - rencana selesai.</p>
+        </div>
+
         <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+          <ActionButton full-width @click="openNoteModal(item)">
+            <span class="inline-flex items-center gap-1">
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+                <path d="M14 3v6h6" />
+                <path d="M9 13h6" />
+                <path d="M9 17h6" />
+              </svg>
+              Catatan
+            </span>
+          </ActionButton>
           <ActionButton full-width @click="openQuickDetail(item)">Ringkas</ActionButton>
           <ActionButton full-width @click="goToDetail(item.id)">Detail</ActionButton>
           <ActionButton full-width @click="goToEdit(item.id)">Edit</ActionButton>
@@ -398,6 +551,69 @@ const exportCsv = () => {
           <p class="rounded-lg bg-black/20 px-3 py-2">Basah (aktual): {{ fmtNumber(selectedItem.aktual_hasil_produksi_basah ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2 sm:col-span-2">Kering (aktual): {{ fmtNumber(selectedItem.aktual_hasil_produksi_kering ?? 0) }} kg</p>
         </div>
+      </div>
+    </div>
+
+    <div v-if="noteModalOpen && selectedForNote" class="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-0 sm:items-center sm:p-4" @click="closeNoteModal">
+      <div class="w-full rounded-t-3xl border border-white/10 bg-[#0a2f29] p-4 sm:max-w-xl sm:rounded-2xl sm:p-5" @click.stop>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-[0.14em] text-emerald-100/70">Catatan Produksi Tanam</p>
+            <h3 class="text-lg font-bold text-white">{{ selectedForNote.kode }}</h3>
+          </div>
+          <ActionButton variant="muted" @click="closeNoteModal">Tutup</ActionButton>
+        </div>
+
+        <!-- Riwayat catatan -->
+        <div class="mt-4 space-y-2">
+          <p class="text-xs font-semibold uppercase tracking-wide text-emerald-100/70">Riwayat Catatan</p>
+          <p v-if="notesLoading" class="text-sm text-emerald-100/60">Memuat catatan...</p>
+          <p v-else-if="!notesList.length" class="text-sm text-emerald-100/50">Belum ada catatan untuk produksi ini.</p>
+          <ul v-else class="max-h-44 space-y-2 overflow-y-auto pr-1">
+            <li
+              v-for="note in notesList"
+              :key="note.id"
+              class="flex items-start justify-between gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2"
+            >
+              <div class="min-w-0">
+                <p class="text-xs text-emerald-100/60">{{ note.tanggal }}</p>
+                <p class="whitespace-pre-wrap text-sm text-emerald-50/90">{{ note.catatan }}</p>
+              </div>
+              <div class="flex shrink-0 gap-1">
+                <button type="button" class="rounded-lg px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/20" @click="startEditNote(note)">Edit</button>
+                <button type="button" class="rounded-lg px-2 py-1 text-xs text-red-300 hover:bg-red-500/20" @click="deleteNote(note)">Hapus</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="noteError" class="mt-3 rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          {{ noteError }}
+        </div>
+
+        <!-- Form tambah / edit catatan -->
+        <form class="mt-4 space-y-3" @submit.prevent="submitNote">
+          <p class="text-xs font-semibold uppercase tracking-wide text-emerald-100/70">
+            {{ editingNote ? 'Edit Catatan' : 'Tambah Catatan Baru' }}
+          </p>
+          <label class="block space-y-1 text-sm text-emerald-100/85">
+            <span>Tanggal *</span>
+            <input v-model="noteForm.tanggal" type="date" class="field w-full" required>
+          </label>
+
+          <label class="block space-y-1 text-sm text-emerald-100/85">
+            <span>Catatan *</span>
+            <textarea v-model="noteForm.catatan" class="field w-full" rows="3" placeholder="Tulis catatan progres produksi..." required></textarea>
+          </label>
+
+          <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <ActionButton v-if="editingNote" variant="muted" full-width @click="cancelEditNote">Batal Edit</ActionButton>
+            <ActionButton variant="muted" full-width @click="closeNoteModal">Tutup</ActionButton>
+            <button type="submit" class="btn-primary w-full sm:w-auto" :disabled="noteSaving">
+              {{ noteSaving ? 'Menyimpan...' : editingNote ? 'Perbarui Catatan' : 'Simpan Catatan' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </section>

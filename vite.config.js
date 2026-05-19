@@ -15,10 +15,24 @@ const normalizeBasePath = (value) => {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const apiBaseUrl = String(env.VITE_API_BASE_URL ?? '').trim()
+  const apiProxyTarget = String(env.VITE_API_PROXY_TARGET ?? 'http://localhost:8000').trim()
+  const shouldProxyApi = apiBaseUrl.startsWith('/')
 
   return {
     base: normalizeBasePath(env.VITE_APP_BASE_PATH),
     plugins: [vue(), vueDevTools(), tailwindcss()],
+    server: shouldProxyApi
+      ? {
+          proxy: {
+            [apiBaseUrl]: {
+              target: apiProxyTarget,
+              changeOrigin: true,
+              secure: false,
+            },
+          },
+        }
+      : undefined,
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

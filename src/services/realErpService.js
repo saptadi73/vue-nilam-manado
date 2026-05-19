@@ -28,7 +28,8 @@ const toAbsoluteUrl = (urlOrPath) => {
 }
 
 const buildUrl = (path, query = {}) => {
-  const url = new URL(`${API_BASE_URL}${path}`)
+  const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+  const url = new URL(`${API_BASE_URL}${path}`, baseOrigin)
   Object.entries(query).forEach(([key, value]) => {
     if (value === undefined || value === null || value === '') return
     url.searchParams.set(key, value)
@@ -135,6 +136,51 @@ export const realErpService = {
   async getFinancingProducts(query = {}) {
     return request('/financing-products', { query })
   },
+  async getFinancingProductById(id) {
+    return request(`/financing-products/${id}`)
+  },
+  async createFinancingProduct(payload) {
+    return request('/financing-products', { method: 'POST', body: withUserUpdateId(payload) })
+  },
+  async updateFinancingProduct(id, payload) {
+    return request(`/financing-products/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
+  },
+  async deleteFinancingProduct(id) {
+    return request(`/financing-products/${id}`, { method: 'DELETE', query: withUserUpdateQuery() })
+  },
+
+  async getSalesProducts(query = {}) {
+    return request('/sales-products', { query })
+  },
+  async getSalesProductById(id) {
+    return request(`/sales-products/${id}`)
+  },
+  async createSalesProduct(payload) {
+    return request('/sales-products', { method: 'POST', body: withUserUpdateId(payload) })
+  },
+  async updateSalesProduct(id, payload) {
+    return request(`/sales-products/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
+  },
+  async deleteSalesProduct(id) {
+    return request(`/sales-products/${id}`, { method: 'DELETE', query: withUserUpdateQuery() })
+  },
+
+  async getPartners(query = {}) {
+    return request('/partners', { query })
+  },
+  async getPartnerById(id) {
+    return request(`/partners/${id}`)
+  },
+  async createPartner(payload) {
+    return request('/partners', { method: 'POST', body: withUserUpdateId(payload) })
+  },
+  async updatePartner(id, payload) {
+    return request(`/partners/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
+  },
+  async deletePartner(id) {
+    return request(`/partners/${id}`, { method: 'DELETE', query: withUserUpdateQuery() })
+  },
+
   async login(email, password) {
     const payload = new URLSearchParams({
       username: String(email ?? '').trim(),
@@ -215,6 +261,27 @@ export const realErpService = {
       query: withUserUpdateQuery(),
     })
   },
+  async getPlantingProductionNotes(productionId, query = {}) {
+    return request(`/planting-productions/${productionId}/notes`, { query })
+  },
+  async createPlantingProductionNote(productionId, payload) {
+    return request(`/planting-productions/${productionId}/notes`, {
+      method: 'POST',
+      body: withUserUpdateId(payload),
+    })
+  },
+  async updatePlantingProductionNote(productionId, noteId, payload) {
+    return request(`/planting-productions/${productionId}/notes/${noteId}`, {
+      method: 'PUT',
+      body: withUserUpdateId(payload),
+    })
+  },
+  async deletePlantingProductionNote(productionId, noteId) {
+    return request(`/planting-productions/${productionId}/notes/${noteId}`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
 
   async createOilProduction(payload) {
     return request('/oil-productions', {
@@ -240,6 +307,27 @@ export const realErpService = {
 
   async deleteOilProduction(id) {
     return request(`/oil-productions/${id}`, {
+      method: 'DELETE',
+      query: withUserUpdateQuery(),
+    })
+  },
+  async getOilProductionNotes(productionId, query = {}) {
+    return request(`/oil-productions/${productionId}/notes`, { query })
+  },
+  async createOilProductionNote(productionId, payload) {
+    return request(`/oil-productions/${productionId}/notes`, {
+      method: 'POST',
+      body: withUserUpdateId(payload),
+    })
+  },
+  async updateOilProductionNote(productionId, noteId, payload) {
+    return request(`/oil-productions/${productionId}/notes/${noteId}`, {
+      method: 'PUT',
+      body: withUserUpdateId(payload),
+    })
+  },
+  async deleteOilProductionNote(productionId, noteId) {
+    return request(`/oil-productions/${productionId}/notes/${noteId}`, {
       method: 'DELETE',
       query: withUserUpdateQuery(),
     })

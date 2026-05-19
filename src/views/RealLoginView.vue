@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { useToast } from '@/composables/useToast'
@@ -201,6 +201,18 @@ const switchMode = (mode) => {
   error.value = ''
   showPassword.value = false
 }
+
+watch(
+  () => route.query.mode,
+  (mode) => {
+    if (mode === 'register') {
+      switchMode('register')
+      return
+    }
+    switchMode('login')
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
