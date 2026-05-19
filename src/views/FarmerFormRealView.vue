@@ -1,6 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import ActionButton from '@/components/ActionButton.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import ListLoadingState from '@/components/ListLoadingState.vue'
+import { appConfig } from '@/config/env'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { realErpService, toAbsoluteUrl } from '@/services/realErpService'
 import { useToast } from '@/composables/useToast'
@@ -19,7 +23,7 @@ const props = defineProps({
 const router = useRouter()
 const toast = useToast()
 
-const defaultPhoto = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80'
+const defaultPhoto = appConfig.defaultFarmerPhotoUrl
 
 const form = ref({
   nama: '',
@@ -224,11 +228,11 @@ onMounted(initPage)
   <section class="space-y-6">
     <SectionHeader eyebrow="Real API" :title="pageTitle" :description="pageDescription" />
 
-    <div class="flex flex-wrap gap-2">
-      <button type="button" class="btn-muted" @click="goBack">Kembali ke List</button>
-    </div>
+    <DataToolbar content-class="flex flex-wrap gap-2">
+      <ActionButton variant="muted" @click="goBack">Kembali ke List</ActionButton>
+    </DataToolbar>
 
-    <p v-if="loading" class="text-sm text-emerald-100/80">Memuat data form...</p>
+    <ListLoadingState v-if="loading" :card-count="4" />
 
     <div v-else class="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
       <div v-if="error" class="mb-4 rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -306,7 +310,7 @@ onMounted(initPage)
       </div>
 
       <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" class="btn-muted w-full sm:w-auto" @click="goBack">Batal</button>
+        <ActionButton variant="muted" full-width @click="goBack">Batal</ActionButton>
         <button v-if="!isReadOnly" type="button" class="btn-primary w-full sm:w-auto" :disabled="saving" @click="submitForm">
           {{ saving ? 'Menyimpan...' : 'Simpan' }}
         </button>

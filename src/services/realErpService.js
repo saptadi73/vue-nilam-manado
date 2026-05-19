@@ -1,6 +1,7 @@
 import { clearAccessToken, getAccessToken, getLoggedInUserId, markSessionExpired } from '@/services/authSession'
+import { appConfig } from '@/config/env'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
+const API_BASE_URL = appConfig.apiBaseUrl
 
 const isWrappedResponse = (payload) => {
   if (!payload || typeof payload !== 'object') return false
@@ -118,6 +119,22 @@ const request = async (path, options = {}) => {
 }
 
 export const realErpService = {
+  // Pembiayaan (Expense)
+  async getFinancings(query = {}) {
+    return request('/financings', { query })
+  },
+  async createFinancing(payload) {
+    return request('/financings', { method: 'POST', body: withUserUpdateId(payload) })
+  },
+  async updateFinancing(id, payload) {
+    return request(`/financings/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
+  },
+  async deleteFinancing(id) {
+    return request(`/financings/${id}`, { method: 'DELETE', query: withUserUpdateQuery() })
+  },
+  async getFinancingProducts(query = {}) {
+    return request('/financing-products', { query })
+  },
   async login(email, password) {
     const payload = new URLSearchParams({
       username: String(email ?? '').trim(),
@@ -305,6 +322,50 @@ export const realErpService = {
         search,
       },
     })
+  },
+
+  async getDashboardSalesVsExpensesByFarmer(query = {}) {
+    return request('/dashboard/sales-vs-expenses/by-farmer', { query })
+  },
+
+  async getDashboardSalesMonthly(query = {}) {
+    return request('/dashboard/sales/monthly', { query })
+  },
+
+  async getDashboardExpensesMonthly(query = {}) {
+    return request('/dashboard/expenses/monthly', { query })
+  },
+
+  async getDashboardPlantingProductionsMonthly(query = {}) {
+    return request('/dashboard/planting-productions/monthly', { query })
+  },
+
+  async getDashboardOilProductionsMonthly(query = {}) {
+    return request('/dashboard/oil-productions/monthly', { query })
+  },
+
+  async getDashboardSalesByFarmer(query = {}) {
+    return request('/dashboard/sales/by-farmer', { query })
+  },
+
+  async getDashboardSalesByFarmerRegency(query = {}) {
+    return request('/dashboard/sales/by-farmer-regency', { query })
+  },
+
+  async getDashboardSalesMonthlyByFarmer(query = {}) {
+    return request('/dashboard/sales/monthly-by-farmer', { query })
+  },
+
+  async getDashboardExpensesMonthlyByFarmer(query = {}) {
+    return request('/dashboard/expenses/monthly-by-farmer', { query })
+  },
+
+  async getDashboardSalesVsExpensesMonthly(query = {}) {
+    return request('/dashboard/sales-vs-expenses/monthly', { query })
+  },
+
+  async getDashboardFarmerNetProfit(query = {}) {
+    return request('/dashboard/farmer-net-profit', { query })
   },
 }
 

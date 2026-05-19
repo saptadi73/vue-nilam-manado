@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ActionButton from '@/components/ActionButton.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import ListLoadingState from '@/components/ListLoadingState.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { useToast } from '@/composables/useToast'
 import { realErpService } from '@/services/realErpService'
@@ -298,11 +301,11 @@ onMounted(init)
   <section class="space-y-6">
     <SectionHeader eyebrow="Real API" :title="pageTitle" :description="pageDescription" />
 
-    <div class="flex flex-wrap gap-2">
-      <button type="button" class="btn-muted" @click="router.push('/real/lahan')">Kembali ke List Lahan</button>
-    </div>
+    <DataToolbar content-class="flex flex-wrap gap-2">
+      <ActionButton variant="muted" @click="router.push('/real/lahan')">Kembali ke List Lahan</ActionButton>
+    </DataToolbar>
 
-    <p v-if="loading" class="text-sm text-emerald-100/80">Menyiapkan form lahan...</p>
+    <ListLoadingState v-if="loading" :card-count="4" />
 
     <div v-else class="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
       <div v-if="error" class="mb-4 rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -390,20 +393,20 @@ onMounted(init)
       <div class="mt-5 space-y-3">
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-white">Koordinat Polygon (Opsional)</p>
-          <button v-if="!isReadOnly" type="button" class="btn-muted" @click="addCoordinateRow">Tambah Titik</button>
+          <ActionButton v-if="!isReadOnly" variant="muted" @click="addCoordinateRow">Tambah Titik</ActionButton>
         </div>
 
         <div class="space-y-2">
           <div v-for="(row, index) in coordinateRows" :key="index" class="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 md:grid-cols-[1fr,1fr,auto]">
             <input v-model="row.latitude" class="field w-full" type="number" step="0.000001" placeholder="Latitude" :disabled="isReadOnly" />
             <input v-model="row.longitude" class="field w-full" type="number" step="0.000001" placeholder="Longitude" :disabled="isReadOnly" />
-            <button v-if="!isReadOnly" type="button" class="icon-action w-full justify-center md:w-auto" @click="removeCoordinateRow(index)">Hapus</button>
+            <ActionButton v-if="!isReadOnly" full-width @click="removeCoordinateRow(index)">Hapus</ActionButton>
           </div>
         </div>
       </div>
 
       <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" class="btn-muted w-full sm:w-auto" @click="router.push('/real/lahan')">Kembali</button>
+        <ActionButton variant="muted" full-width @click="router.push('/real/lahan')">Kembali</ActionButton>
         <button v-if="!isReadOnly" type="button" class="btn-primary w-full sm:w-auto" :disabled="saving" @click="submitForm">
           {{ saving ? 'Menyimpan...' : 'Simpan Lahan' }}
         </button>

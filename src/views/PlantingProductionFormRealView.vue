@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ActionButton from '@/components/ActionButton.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import ListLoadingState from '@/components/ListLoadingState.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { useToast } from '@/composables/useToast'
 import { realErpService } from '@/services/realErpService'
@@ -218,11 +221,11 @@ onMounted(init)
   <section class="space-y-6">
     <SectionHeader eyebrow="Real API" :title="pageTitle" :description="pageDescription" />
 
-    <div class="flex flex-wrap gap-2">
-      <button type="button" class="btn-muted" @click="router.push('/real/produksi-tanam')">Kembali ke List Produksi Tanam</button>
-    </div>
+    <DataToolbar content-class="flex flex-wrap gap-2">
+      <ActionButton variant="muted" @click="router.push('/real/produksi-tanam')">Kembali ke List Produksi Tanam</ActionButton>
+    </DataToolbar>
 
-    <p v-if="loading" class="text-sm text-emerald-100/80">Memuat data form...</p>
+    <ListLoadingState v-if="loading" :card-count="4" />
 
     <div v-else class="rounded-2xl border border-white/10 bg-black/20 p-5">
       <div v-if="error" class="mb-4 rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -331,13 +334,11 @@ onMounted(init)
       </div>
 
       <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" class="btn-muted w-full sm:w-auto" @click="router.push('/real/produksi-tanam')">Batal</button>
+        <ActionButton variant="muted" full-width @click="router.push('/real/produksi-tanam')">Batal</ActionButton>
         <button v-if="!isReadOnly" type="button" class="btn-primary w-full sm:w-auto" :disabled="saving" @click="submitForm">
           {{ saving ? 'Menyimpan...' : props.mode === 'edit' ? 'Update Produksi Tanam' : 'Simpan Produksi Tanam' }}
         </button>
-        <button v-else type="button" class="btn-primary w-full sm:w-auto" @click="router.push(`/real/produksi-tanam/${props.id}/edit`)">
-          Edit Data
-        </button>
+        <ActionButton v-else variant="primary" full-width @click="router.push(`/real/produksi-tanam/${props.id}/edit`)">Edit Data</ActionButton>
       </div>
     </div>
   </section>

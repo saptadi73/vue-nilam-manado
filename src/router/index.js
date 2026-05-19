@@ -4,9 +4,11 @@ import { hasAccessToken } from '@/services/authSession'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
+    { path: '/', redirect: () => (hasAccessToken() ? '/real/dashboard' : '/real/login') },
+    { path: '/demo/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
     { path: '/petani', name: 'petani', component: () => import('@/views/FarmerPerformanceView.vue') },
     { path: '/real/login', name: 'real-login', component: () => import('@/views/RealLoginView.vue') },
+    { path: '/real/dashboard', name: 'real-dashboard', component: () => import('@/views/RealDashboardView.vue'), meta: { requiresAuth: true } },
     { path: '/real/petani', name: 'petani-real', component: () => import('@/views/FarmerListRealView.vue'), meta: { requiresAuth: true } },
     {
       path: '/real/petani/new',
@@ -29,8 +31,16 @@ const router = createRouter({
       props: (route) => ({ mode: 'edit', id: route.params.id }),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/real/petani/:id/produksi-update',
+      name: 'petani-real-production-update',
+      component: () => import('@/views/FarmerProductionUpdateRealView.vue'),
+      props: (route) => ({ id: route.params.id }),
+      meta: { requiresAuth: true },
+    },
     { path: '/real/wilayah', name: 'wilayah-real', component: () => import('@/views/RegionMasterRealView.vue'), meta: { requiresAuth: true } },
     { path: '/real/profile', name: 'real-profile', component: () => import('@/views/RealProfileView.vue'), meta: { requiresAuth: true } },
+    { path: '/real/expense', name: 'expense-real-list', component: () => import('@/views/ExpenseListRealView.vue'), meta: { requiresAuth: true } },
     { path: '/real/lahan', name: 'lahan-real-list', component: () => import('@/views/LandListRealView.vue'), meta: { requiresAuth: true } },
     {
       path: '/real/lahan/new',
@@ -103,7 +113,7 @@ router.beforeEach((to) => {
   }
 
   if (to.name === 'real-login' && hasAccessToken()) {
-    return { name: 'petani-real' }
+    return { name: 'real-dashboard' }
   }
 
   return true

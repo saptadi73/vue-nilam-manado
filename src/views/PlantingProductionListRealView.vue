@@ -1,12 +1,18 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import ActionButton from '@/components/ActionButton.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
+import ListLoadingState from '@/components/ListLoadingState.vue'
+import PageState from '@/components/PageState.vue'
 import { realErpService } from '@/services/realErpService'
 import { useToast } from '@/composables/useToast'
 import { fmtNumber } from '@/utils/formatters'
 
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 
 const loading = ref(false)
@@ -15,13 +21,35 @@ const searchTerm = ref('')
 const statusFilter = ref('all')
 const farmerFilter = ref('')
 const landFilter = ref('')
+const pageSize = ref(9)
+const currentPage = ref(1)
 const items = ref([])
 const farmers = ref([])
 const lands = ref([])
+const detailModalOpen = ref(false)
+const selectedItem = ref(null)
 
 let searchTimer = null
 
 const normalize = (value) => String(value ?? '').trim()
+const isUnfinishedStatus = (status) => String(status ?? '').toLowerCase() !== 'selesai'
+
+const applyRouteFilters = () => {
+  const petaniId = normalize(route.query.petani_id)
+  const lahanId = normalize(route.query.lahan_id)
+  const status = normalize(route.query.status)
+  const search = normalize(route.query.search)
+
+  if (petaniId) farmerFilter.value = petaniId
+  if (lahanId) landFilter.value = lahanId
+  if (search) searchTerm.value = search
+
+  if (status === 'belum_selesai') {
+    statusFilter.value = 'belum_selesai'
+  } else if (['rencana', 'berjalan', 'selesai', 'all'].includes(status)) {
+    statusFilter.value = status
+  }
+}
 
 const loadFarmers = async () => {
   const data = await realErpService.getFarmers()
@@ -40,11 +68,12 @@ const loadItems = async () => {
   error.value = ''
   try {
     const query = { search: normalize(searchTerm.value) }
-    if (statusFilter.value !== 'all') query.status = statusFilter.value
+    if (statusFilter.value !== 'all' && statusFilter.value !== 'belum_selesai') query.status = statusFilter.value
     if (farmerFilter.value) query.petani_id = farmerFilter.value
     if (landFilter.value) query.lahan_id = landFilter.value
     const data = await realErpService.getPlantingProductions(query)
-    items.value = Array.isArray(data) ? data : []
+    const rows = Array.isArray(data) ? data : []
+    items.value = statusFilter.value === 'belum_selesai' ? rows.filter((row) => isUnfinishedStatus(row?.status)) : rows
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Gagal memuat daftar produksi tanam.'
   } finally {
@@ -65,6 +94,7 @@ const resetFilters = () => {
   statusFilter.value = 'all'
   farmerFilter.value = ''
   landFilter.value = ''
+  currentPage.value = 1
 }
 
 const goToDetail = (id) => {
@@ -90,25 +120,152 @@ const deleteItem = async (item) => {
   }
 }
 
+const openQuickDetail = (item) => {
+  selectedItem.value = item
+  detailModalOpen.value = true
+}
+
+const closeQuickDetail = () => {
+  detailModalOpen.value = false
+  selectedItem.value = null
+}
+
+const onOverlayClose = (event) => {
+  if (event.target === event.currentTarget) {
+    closeQuickDetail()
+  }
+}
+
 watch(searchTerm, () => {
   clearTimeout(searchTimer)
+  currentPage.value = 1
   searchTimer = setTimeout(() => loadItems(), 300)
 })
 
-watch(statusFilter, loadItems)
+watch(statusFilter, async () => {
+  currentPage.value = 1
+  await loadItems()
+})
 watch(farmerFilter, async () => {
+  currentPage.value = 1
   landFilter.value = ''
   await loadLands()
   await loadItems()
 })
-watch(landFilter, loadItems)
+watch(landFilter, async () => {
+  currentPage.value = 1
+  await loadItems()
+})
 
-onMounted(refreshAll)
+onMounted(async () => {
+  applyRouteFilters()
+  await refreshAll()
+})
 
 const selectedFarmer = computed(() => farmers.value.find((item) => item.id === farmerFilter.value) ?? null)
 const selectedLand = computed(() => lands.value.find((item) => item.id === landFilter.value) ?? null)
+const totalItems = computed(() => items.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / pageSize.value)))
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return items.value.slice(start, start + pageSize.value)
+})
+
+watch([totalItems, pageSize], () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+})
+
+const goToPrevPage = () => {
+  if (currentPage.value > 1) currentPage.value -= 1
+}
+
+const goToNextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value += 1
+}
 
 const cardSubtitle = (item) => [item.petani?.nama || item.petani_nama || item.petani_id || '-', item.lahan?.kode || item.lahan_kode || item.lahan_id || '-'].join(' | ')
+
+const statusBadgeClass = (status) => {
+  if (status === 'selesai') return 'bg-cyan-500/20 text-cyan-50'
+  if (status === 'berjalan') return 'bg-amber-500/20 text-amber-50'
+  return 'bg-emerald-500/20 text-emerald-50'
+}
+
+const toCsvValue = (value) => {
+  const text = String(value ?? '')
+  if (text.includes('"')) {
+    return `"${text.replaceAll('"', '""')}"`
+  }
+  if (text.includes(',') || text.includes('\n')) {
+    return `"${text}"`
+  }
+  return text
+}
+
+const exportCsv = () => {
+  if (!items.value.length) {
+    toast.info('Tidak ada data untuk diexport.')
+    return
+  }
+
+  const headers = [
+    'id',
+    'kode',
+    'status',
+    'tanggal_mulai',
+    'tanggal_akhir',
+    'aktual_tanggal_akhir',
+    'petani',
+    'petani_nik',
+    'petani_hp',
+    'lahan',
+    'luas_garapan',
+    'jarak_tanam',
+    'jumlah_batang',
+    'cara_tanam',
+    'perawatan',
+    'hasil_basah_target',
+    'hasil_basah_aktual',
+    'hasil_kering_aktual',
+    'rasio_kering_basah',
+    'rasio_luas_hasil_kering',
+  ]
+  const rows = items.value.map((item) => [
+    item.id,
+    item.kode,
+    item.status,
+    item.tanggal_mulai,
+    item.tanggal_akhir,
+    item.aktual_tanggal_akhir ?? '',
+    item.petani?.nama || item.petani_nama || item.petani_id || '',
+    item.petani?.nik || '',
+    item.petani?.hp || '',
+    item.lahan?.kode || item.lahan_kode || item.lahan_id || '',
+    item.luas_garapan,
+    item.jarak_tanam ?? '',
+    item.jumlah_batang ?? '',
+    item.cara_tanam ?? '',
+    item.perawatan ?? '',
+    item.hasil_produksi_basah ?? '',
+    item.aktual_hasil_produksi_basah ?? '',
+    item.aktual_hasil_produksi_kering ?? '',
+    item.rasio_berat_kering_ke_basah ?? '',
+    item.rasio_luas_garapan_ke_hasil_kering ?? '',
+  ])
+
+  const csv = [headers, ...rows].map((row) => row.map(toCsvValue).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `produksi-tanam-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
@@ -119,10 +276,11 @@ const cardSubtitle = (item) => [item.petani?.nama || item.petani_nama || item.pe
       description="Cari produksi tanam berdasarkan kode, petani, lahan, atau status dengan tampilan card yang nyaman di mobile."
     />
 
-    <div class="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <DataToolbar content-class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <input v-model="searchTerm" class="field w-full" type="text" placeholder="Cari kode / petani / lahan..." />
       <select v-model="statusFilter" class="field w-full">
         <option value="all">Semua Status</option>
+        <option value="belum_selesai">Belum Selesai</option>
         <option value="rencana">Rencana</option>
         <option value="berjalan">Berjalan</option>
         <option value="selesai">Selesai</option>
@@ -136,12 +294,19 @@ const cardSubtitle = (item) => [item.petani?.nama || item.petani_nama || item.pe
         <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} ha</option>
       </select>
 
+      <select v-model.number="pageSize" class="field w-full">
+        <option :value="6">6 per halaman</option>
+        <option :value="9">9 per halaman</option>
+        <option :value="12">12 per halaman</option>
+      </select>
+
       <div class="flex flex-col gap-2 sm:flex-row xl:col-span-4">
-        <button type="button" class="btn-primary w-full sm:w-auto" @click="refreshAll">Refresh</button>
-        <button type="button" class="btn-muted w-full sm:w-auto" @click="resetFilters">Reset Filter</button>
-        <button type="button" class="btn-muted w-full sm:w-auto" @click="router.push('/real/produksi-tanam/new')">Tambah Produksi Tanam</button>
+        <ActionButton variant="primary" full-width @click="refreshAll">Refresh</ActionButton>
+        <ActionButton variant="muted" full-width @click="resetFilters">Reset Filter</ActionButton>
+        <ActionButton variant="muted" full-width @click="exportCsv">Export CSV</ActionButton>
+        <ActionButton variant="muted" full-width @click="router.push('/real/produksi-tanam/new')">Tambah Produksi Tanam</ActionButton>
       </div>
-    </div>
+    </DataToolbar>
 
     <p v-if="selectedFarmer || selectedLand" class="text-sm text-emerald-100/80">
       Filter aktif:
@@ -150,41 +315,90 @@ const cardSubtitle = (item) => [item.petani?.nama || item.petani_nama || item.pe
       <span v-if="selectedLand">Lahan {{ selectedLand.kode }}</span>
     </p>
 
-    <p v-if="loading" class="text-sm text-emerald-100/80">Memuat daftar produksi tanam...</p>
-    <div v-else-if="error" class="rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-      {{ error }}
-    </div>
-    <div v-else-if="!items.length" class="rounded-2xl border border-white/10 bg-black/20 px-4 py-6 text-sm text-emerald-100/80">
-      Data produksi tanam tidak ditemukan.
-    </div>
+    <p v-if="!loading && !error" class="text-sm text-emerald-100/80">
+      Total hasil filter: {{ items.length }} data
+    </p>
+
+    <ListLoadingState v-if="loading" :card-count="6" />
+    <PageState
+      v-else-if="error"
+      variant="error"
+      title="Data produksi tanam belum berhasil dimuat"
+      :description="error"
+      action-label="Coba Lagi"
+      @action="refreshAll"
+    />
+    <PageState
+      v-else-if="!items.length"
+      title="Data produksi tanam tidak ditemukan"
+      description="Belum ada data yang sesuai dengan filter saat ini. Coba ubah filter atau refresh data."
+      action-label="Refresh Data"
+      @action="refreshAll"
+    />
 
     <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <article v-for="item in items" :key="item.id" class="rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
+      <article v-for="item in paginatedItems" :key="item.id" class="rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
         <div class="space-y-2">
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-xs text-emerald-100/75">ID: {{ item.id }}</p>
               <h3 class="text-lg font-bold text-white">{{ item.kode }}</h3>
             </div>
-            <span class="rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-semibold text-emerald-50">{{ item.status }}</span>
+            <span class="rounded-full px-2 py-1 text-xs font-semibold" :class="statusBadgeClass(item.status)">{{ item.status }}</span>
           </div>
           <p class="text-sm text-emerald-100/85">{{ cardSubtitle(item) }}</p>
         </div>
 
         <div class="mt-4 grid grid-cols-1 gap-2 text-xs text-emerald-100/90 sm:grid-cols-2">
           <p class="rounded-lg bg-black/20 px-3 py-2">Mulai: {{ item.tanggal_mulai || '-' }}</p>
-          <p class="rounded-lg bg-black/20 px-3 py-2">Selesai: {{ item.tanggal_selesai || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Selesai: {{ item.aktual_tanggal_akhir || item.tanggal_akhir || '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Luas Garapan: {{ item.luas_garapan ?? '-' }} ha</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Hasil Basah: {{ fmtNumber(item.aktual_hasil_produksi_basah ?? item.hasil_produksi_basah ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2 sm:col-span-2">Hasil Kering: {{ fmtNumber(item.aktual_hasil_produksi_kering ?? 0) }} kg</p>
         </div>
 
         <div class="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button type="button" class="icon-action w-full justify-center sm:w-auto" @click="goToDetail(item.id)">Detail</button>
-          <button type="button" class="icon-action w-full justify-center sm:w-auto" @click="goToEdit(item.id)">Edit</button>
-          <button type="button" class="icon-action w-full justify-center border-red-300/40 text-red-100 hover:border-red-300/60 hover:bg-red-500/20 sm:w-auto" @click="deleteItem(item)">Hapus</button>
+          <ActionButton full-width @click="openQuickDetail(item)">Ringkas</ActionButton>
+          <ActionButton full-width @click="goToDetail(item.id)">Detail</ActionButton>
+          <ActionButton full-width @click="goToEdit(item.id)">Edit</ActionButton>
+          <ActionButton variant="danger" full-width @click="deleteItem(item)">Hapus</ActionButton>
         </div>
       </article>
+    </div>
+
+    <PaginationBar
+      v-if="items.length"
+      :summary="`Halaman ${currentPage} dari ${totalPages}`"
+      :page="currentPage"
+      :total-pages="totalPages"
+      @prev="goToPrevPage"
+      @next="goToNextPage"
+    />
+
+    <div v-if="detailModalOpen && selectedItem" class="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-0 sm:items-center sm:p-4" @click="onOverlayClose">
+      <div class="w-full rounded-t-3xl border border-white/10 bg-[#0a2f29] p-4 sm:max-w-2xl sm:rounded-2xl sm:p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-[0.14em] text-emerald-100/70">Ringkasan Produksi Tanam</p>
+            <h3 class="text-lg font-bold text-white">{{ selectedItem.kode }}</h3>
+          </div>
+          <ActionButton variant="muted" @click="closeQuickDetail">Tutup</ActionButton>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-2 text-sm text-emerald-100/90 sm:grid-cols-2">
+          <p class="rounded-lg bg-black/20 px-3 py-2">Status: {{ selectedItem.status || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Mulai: {{ selectedItem.tanggal_mulai || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Tanggal Akhir: {{ selectedItem.tanggal_akhir || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Aktual Akhir: {{ selectedItem.aktual_tanggal_akhir || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Petani: {{ selectedItem.petani?.nama || selectedItem.petani_nama || selectedItem.petani_id || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Lahan: {{ selectedItem.lahan?.kode || selectedItem.lahan_kode || selectedItem.lahan_id || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Luas Garapan: {{ selectedItem.luas_garapan ?? '-' }} ha</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Jumlah Batang: {{ selectedItem.jumlah_batang ?? '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Basah (target): {{ fmtNumber(selectedItem.hasil_produksi_basah ?? 0) }} kg</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Basah (aktual): {{ fmtNumber(selectedItem.aktual_hasil_produksi_basah ?? 0) }} kg</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2 sm:col-span-2">Kering (aktual): {{ fmtNumber(selectedItem.aktual_hasil_produksi_kering ?? 0) }} kg</p>
+        </div>
+      </div>
     </div>
   </section>
 </template>

@@ -1,5 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import ActionButton from '@/components/ActionButton.vue'
+import ListLoadingState from '@/components/ListLoadingState.vue'
+import PageState from '@/components/PageState.vue'
 import L from 'leaflet'
 
 const props = defineProps({
@@ -173,21 +176,24 @@ const fmtCoord = (value) => Number(value).toFixed(6)
           <h3 class="text-lg font-semibold text-white">{{ farmer?.nama || '-' }}</h3>
           <p class="text-xs text-emerald-100/75">ID Petani: {{ farmer?.id || '-' }}</p>
         </div>
-        <button type="button" class="rounded-lg bg-white/10 px-3 py-2 text-sm text-emerald-50 hover:bg-white/20" @click="closeModal">
-          Tutup
-        </button>
+        <ActionButton variant="muted" @click="closeModal">Tutup</ActionButton>
       </div>
 
       <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:p-5">
-        <p v-if="loading" class="text-sm text-emerald-100/80">Memuat data lahan...</p>
+        <ListLoadingState v-if="loading" :card-count="3" />
 
-        <div v-else-if="error" class="rounded-xl border border-red-300/40 bg-red-500/10 p-4 text-sm text-red-100">
-          {{ error }}
-        </div>
+        <PageState
+          v-else-if="error"
+          variant="error"
+          title="Data lahan belum berhasil dimuat"
+          :description="error"
+        />
 
-        <div v-else-if="!availableLands.length" class="rounded-xl border border-amber-200/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-          Belum ada data lahan untuk petani ini.
-        </div>
+        <PageState
+          v-else-if="!availableLands.length"
+          title="Belum ada data lahan untuk petani ini"
+          description="Tambahkan lahan baru dari halaman list petani atau form lahan untuk melihat polygon area di sini."
+        />
 
         <template v-else>
           <div class="grid gap-4 lg:grid-cols-[280px,1fr]">
@@ -249,7 +255,7 @@ const fmtCoord = (value) => Number(value).toFixed(6)
 
       <div class="sticky bottom-0 border-t border-white/10 bg-[#0a2f29]/95 px-4 py-3 backdrop-blur sm:px-5">
         <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button type="button" class="btn-muted w-full sm:w-auto" @click="closeModal">Tutup</button>
+          <ActionButton variant="muted" full-width @click="closeModal">Tutup</ActionButton>
         </div>
       </div>
     </div>

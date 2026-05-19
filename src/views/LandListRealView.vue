@@ -1,7 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import ActionButton from '@/components/ActionButton.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
+import ListLoadingState from '@/components/ListLoadingState.vue'
+import PageState from '@/components/PageState.vue'
 import { useToast } from '@/composables/useToast'
 import { realErpService } from '@/services/realErpService'
 
@@ -72,6 +77,11 @@ const onChangePageSize = () => {
   currentPage.value = 1
 }
 
+const updatePageSize = (value) => {
+  pageSize.value = value
+  onChangePageSize()
+}
+
 const goToCreate = () => {
   router.push('/real/lahan/new')
 }
@@ -113,7 +123,7 @@ onMounted(loadLands)
       description="List lahan dengan fitur search dan tombol CRUD untuk mempercepat update data lahan."
     />
 
-    <div class="flex flex-wrap items-center gap-3">
+    <DataToolbar>
       <input
         v-model="searchTerm"
         type="text"
@@ -121,20 +131,29 @@ onMounted(loadLands)
         placeholder="Cari kode lahan, pemilik, kab/kota, atau kecamatan..."
         @keyup.enter="loadLands"
       />
-      <button type="button" class="btn-muted" @click="loadLands">Search</button>
-      <button type="button" class="btn-muted" @click="loadLands">Refresh</button>
-      <button type="button" class="btn-primary" @click="goToCreate">Tambah Lahan</button>
-    </div>
+      <ActionButton variant="muted" @click="loadLands">Search</ActionButton>
+      <ActionButton variant="muted" @click="loadLands">Refresh</ActionButton>
+      <ActionButton variant="primary" @click="goToCreate">Tambah Lahan</ActionButton>
+    </DataToolbar>
 
-    <p v-if="loading" class="text-sm text-emerald-100/80">Memuat data lahan dari API...</p>
+    <ListLoadingState v-if="loading" :card-count="6" />
 
-    <div v-else-if="error" class="rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-      {{ error }}
-    </div>
+    <PageState
+      v-else-if="error"
+      variant="error"
+      title="Data lahan belum berhasil dimuat"
+      :description="error"
+      action-label="Coba Lagi"
+      @action="loadLands"
+    />
 
-    <div v-else-if="!filteredLands.length" class="rounded-2xl border border-white/10 bg-black/20 px-4 py-6 text-sm text-emerald-100/80">
-      Data lahan tidak ditemukan untuk kata kunci tersebut.
-    </div>
+    <PageState
+      v-else-if="!filteredLands.length"
+      title="Data lahan tidak ditemukan"
+      description="Belum ada lahan yang cocok dengan kata kunci saat ini. Coba kata kunci lain atau refresh data."
+      action-label="Refresh Data"
+      @action="loadLands"
+    />
 
     <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <article v-for="land in paginatedLands" :key="land.id" class="rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
@@ -154,35 +173,31 @@ onMounted(loadLands)
         </div>
 
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button type="button" class="icon-action w-full justify-center sm:w-auto" @click="goToDetail(land.id)">Detail</button>
-          <button type="button" class="icon-action w-full justify-center sm:w-auto" @click="goToEdit(land.id)">Edit</button>
-          <button
-            type="button"
-            class="icon-action w-full justify-center border-red-300/40 text-red-100 hover:border-red-300/60 hover:bg-red-500/20 sm:w-auto"
+          <ActionButton full-width @click="goToDetail(land.id)">Detail</ActionButton>
+          <ActionButton full-width @click="goToEdit(land.id)">Edit</ActionButton>
+          <ActionButton
+            variant="danger"
+            full-width
             :disabled="deletingId === land.id"
             @click="deleteLand(land)"
           >
             {{ deletingId === land.id ? 'Menghapus...' : 'Hapus' }}
-          </button>
+          </ActionButton>
         </div>
       </article>
     </div>
 
-    <div v-if="filteredLands.length" class="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <p class="text-sm text-emerald-100/85">Menampilkan {{ pageInfo }}</p>
-
-      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <label class="text-sm text-emerald-100/85" for="pageSize">Per halaman</label>
-        <select id="pageSize" v-model.number="pageSize" class="field" @change="onChangePageSize">
-          <option :value="6">6</option>
-          <option :value="9">9</option>
-          <option :value="12">12</option>
-        </select>
-
-        <button type="button" class="btn-muted" :disabled="currentPage <= 1" @click="goToPrevPage">Sebelumnya</button>
-        <span class="px-2 text-sm text-emerald-100/85">Halaman {{ currentPage }} / {{ totalPages }}</span>
-        <button type="button" class="btn-muted" :disabled="currentPage >= totalPages" @click="goToNextPage">Berikutnya</button>
-      </div>
-    </div>
+    <PaginationBar
+      v-if="filteredLands.length"
+      :summary="`Menampilkan ${pageInfo}`"
+      :page="currentPage"
+      :total-pages="totalPages"
+      :page-size="pageSize"
+      :page-size-options="[6, 9, 12]"
+      show-page-size
+      @prev="goToPrevPage"
+      @next="goToNextPage"
+      @update:page-size="updatePageSize"
+    />
   </section>
 </template>
