@@ -8,6 +8,7 @@ import PaginationBar from '@/components/PaginationBar.vue'
 import { useToast } from '@/composables/useToast'
 import { fmtCurrency, fmtNumber } from '@/utils/formatters'
 import { realErpService } from '@/services/realErpService'
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 const props = defineProps({
   open: Boolean,
@@ -99,17 +100,46 @@ function closeForm() {
   showForm.value = false
   formError.value = ''
 }
+
+function validateForm() {
+  const nama = String(form.value.nama ?? '').trim()
+  const tanggal = String(form.value.tanggal ?? '').trim()
+  const produkId = String(form.value.produk_id ?? '').trim()
+  const harga = Number(form.value.harga)
+  const quantity = Number(form.value.quantity)
+
+  if (!nama) return 'Nama expense wajib diisi.'
+  if (nama.length > 150) return 'Nama expense maksimal 150 karakter.'
+  if (!ISO_DATE_REGEX.test(tanggal)) return 'Tanggal expense wajib format YYYY-MM-DD.'
+  if (!produkId) return 'Produk pembiayaan wajib dipilih.'
+  if (!Number.isFinite(harga) || harga < 0) return 'Harga harus angka dan tidak boleh negatif.'
+  if (!Number.isFinite(quantity) || quantity <= 0) return 'Quantity harus lebih dari 0.'
+
+  if (!products.value.some((item) => item.id === produkId)) {
+    return 'Produk pembiayaan tidak valid. Silakan pilih ulang.'
+  }
+
+  return ''
+}
+
 async function saveExpense() {
+  const validationError = validateForm()
+  if (validationError) {
+    formError.value = validationError
+    toast.error(validationError)
+    return
+  }
+
   saving.value = true
   formError.value = ''
   try {
     const payload = {
-      nama: form.value.nama,
-      tanggal: form.value.tanggal,
-      produk_id: form.value.produk_id,
+      nama: String(form.value.nama ?? '').trim(),
+      tanggal: String(form.value.tanggal ?? '').trim(),
+      produk_id: String(form.value.produk_id ?? '').trim(),
       harga: Number(form.value.harga),
       quantity: Number(form.value.quantity),
-      deskripsi: form.value.deskripsi,
+      deskripsi: String(form.value.deskripsi ?? '').trim() || null,
       petani_id: props.farmerId,
     }
     if (form.value.id) {
@@ -226,7 +256,7 @@ async function deleteExpense(item) {
         @next="page = Math.min(totalPages, page + 1)"
       />
 
-      <div v-if="showForm" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4" @click="closeForm">
+      <div v-if="showForm" class="fixed inset-0 z-60 flex items-center justify-center bg-black/75 p-4" @click="closeForm">
         <div class="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#0a2f29] p-5" @click.stop>
           <div class="flex items-center justify-between">
             <div>

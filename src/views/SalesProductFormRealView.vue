@@ -21,6 +21,7 @@ const props = defineProps({
 
 const router = useRouter()
 const toast = useToast()
+const SALES_PRODUCT_TYPES = ['barang', 'jasa']
 
 const loading = ref(false)
 const saving = ref(false)
@@ -41,6 +42,23 @@ const pageDescription = computed(() => (props.mode === 'edit'
 
 const goBack = () => {
   router.push('/real/produk-penjualan')
+}
+
+const validateForm = () => {
+  const nama = String(form.value.nama ?? '').trim()
+  const satuan = String(form.value.satuan ?? '').trim()
+  const harga = Number(form.value.harga)
+
+  if (!nama) return 'Nama produk wajib diisi.'
+  if (nama.length > 150) return 'Nama produk maksimal 150 karakter.'
+  if (!SALES_PRODUCT_TYPES.includes(form.value.jenis)) {
+    return 'Jenis produk harus barang atau jasa.'
+  }
+  if (!Number.isFinite(harga) || harga < 0) return 'Harga harus angka dan tidak boleh negatif.'
+  if (!satuan) return 'Satuan wajib diisi.'
+  if (satuan.length > 30) return 'Satuan maksimal 30 karakter.'
+
+  return ''
 }
 
 const loadDetail = async () => {
@@ -65,6 +83,13 @@ const loadDetail = async () => {
 }
 
 const submitForm = async () => {
+  const validationError = validateForm()
+  if (validationError) {
+    error.value = validationError
+    toast.error(validationError)
+    return
+  }
+
   saving.value = true
   error.value = ''
 

@@ -16,6 +16,8 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const STATUS_OPTIONS = ['rencana', 'berjalan', 'selesai']
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 const loading = ref(false)
 const saving = ref(false)
@@ -141,24 +143,103 @@ watch(
   },
 )
 
+const isIsoDate = (value) => ISO_DATE_REGEX.test(String(value ?? '').trim())
+
+const ensureProductionCodeNotDuplicate = async (kode, currentId = '') => {
+  const rows = await realErpService.getPlantingProductions({ search: kode })
+  if (!Array.isArray(rows)) return
+
+  const duplicate = rows.find((item) => String(item?.kode ?? '').trim().toLowerCase() === kode.toLowerCase() && String(item?.id ?? '') !== String(currentId ?? ''))
+  if (duplicate) {
+    throw new Error('Kode produksi tanam sudah terdaftar. Gunakan kode lain.')
+  }
+}
+
+const validateForm = () => {
+  const kode = String(form.value.kode ?? '').trim()
+  if (!kode) return 'Kode produksi tanam wajib diisi.'
+  if (kode.length > 50) return 'Kode produksi tanam maksimal 50 karakter.'
+
+  if (!isIsoDate(form.value.tanggal_mulai)) return 'Tanggal mulai wajib diisi dengan format YYYY-MM-DD.'
+  if (!form.value.petani_id) return 'Petani wajib dipilih.'
+
+  const hasFarmer = farmers.value.some((item) => item.id === form.value.petani_id)
+  if (!hasFarmer) return 'Petani tidak valid. Silakan pilih ulang.'
+
+  if (form.value.lahan_id) {
+    const hasLand = lands.value.some((item) => item.id === form.value.lahan_id)
+    if (!hasLand) return 'Lahan tidak valid untuk petani terpilih.'
+  }
+
+  if (!STATUS_OPTIONS.includes(form.value.status)) {
+    return 'Status harus salah satu dari: rencana, berjalan, selesai.'
+  }
+
+  const luasGarapan = Number(form.value.luas_garapan)
+  if (!Number.isFinite(luasGarapan) || luasGarapan <= 0) {
+    return 'Luas garapan harus lebih dari 0.'
+  }
+
+  const numericOptionalFields = [
+    'jumlah_batang',
+    'hasil_produksi_basah',
+    'aktual_hasil_produksi_basah',
+    'aktual_hasil_produksi_kering',
+  ]
+
+  for (const field of numericOptionalFields) {
+    const raw = String(form.value[field] ?? '').trim()
+    if (!raw) continue
+    const numeric = Number(raw)
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      return `${field.replaceAll('_', ' ')} harus berupa angka dan tidak boleh negatif.`
+    }
+  }
+
+  if (form.value.tanggal_akhir && !isIsoDate(form.value.tanggal_akhir)) {
+    return 'Tanggal akhir harus format YYYY-MM-DD.'
+  }
+  if (form.value.aktual_tanggal_akhir && !isIsoDate(form.value.aktual_tanggal_akhir)) {
+    return 'Aktual tanggal akhir harus format YYYY-MM-DD.'
+  }
+
+  if (form.value.tanggal_akhir && form.value.tanggal_akhir < form.value.tanggal_mulai) {
+    return 'Tanggal akhir tidak boleh lebih kecil dari tanggal mulai.'
+  }
+  if (form.value.aktual_tanggal_akhir && form.value.aktual_tanggal_akhir < form.value.tanggal_mulai) {
+    return 'Aktual tanggal akhir tidak boleh lebih kecil dari tanggal mulai.'
+  }
+
+  if (form.value.status === 'selesai') {
+    if (!form.value.aktual_tanggal_akhir) return 'Aktual tanggal akhir wajib diisi saat status selesai.'
+    if (!String(form.value.aktual_hasil_produksi_kering ?? '').trim()) {
+      return 'Aktual hasil produksi kering wajib diisi saat status selesai.'
+    }
+  }
+
+  return ''
+}
+
 const submitForm = async () => {
   if (isReadOnly.value) return
+
+  const validationError = validateForm()
+  if (validationError) {
+    toast.error(validationError)
+    return
+  }
 
   saving.value = true
   error.value = ''
 
   try {
-    if (!form.value.kode.trim()) throw new Error('Kode produksi tanam wajib diisi.')
-    if (!form.value.tanggal_mulai) throw new Error('Tanggal mulai wajib diisi.')
-    if (!form.value.petani_id) throw new Error('Petani wajib dipilih.')
+    const kode = form.value.kode.trim()
+    await ensureProductionCodeNotDuplicate(kode, props.mode === 'edit' ? props.id : '')
 
     const luasGarapan = Number(form.value.luas_garapan)
-    if (!Number.isFinite(luasGarapan) || luasGarapan <= 0) {
-      throw new Error('Luas garapan harus lebih dari 0.')
-    }
 
     const payload = {
-      kode: form.value.kode.trim(),
+      kode,
       tanggal_mulai: form.value.tanggal_mulai,
       luas_garapan: luasGarapan,
       status: form.value.status,

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ActionButton from '@/components/ActionButton.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
@@ -41,6 +41,8 @@ const saving = ref(false)
 const error = ref('')
 const farmerData = ref(null)
 const photoFile = ref(null)
+const pickedPhotoUrl = ref('')
+const pickedPhotoObjectUrl = ref('')
 
 const provinsiOptions = ref([])
 const kabupatenOptions = ref([])
@@ -62,6 +64,7 @@ const pageDescription = computed(() => {
 })
 
 const currentPhotoUrl = computed(() => {
+  if (pickedPhotoUrl.value) return pickedPhotoUrl.value
   if (farmerData.value?.foto_url) return toAbsoluteUrl(farmerData.value.foto_url)
   return defaultPhoto
 })
@@ -136,7 +139,38 @@ const initPage = async () => {
 
 const onPickPhoto = (event) => {
   const [file] = event?.target?.files ?? []
+
+  if (pickedPhotoObjectUrl.value) {
+    URL.revokeObjectURL(pickedPhotoObjectUrl.value)
+    pickedPhotoObjectUrl.value = ''
+  }
+
+  if (pickedPhotoUrl.value) {
+    pickedPhotoUrl.value = ''
+  }
+
   photoFile.value = file ?? null
+
+  if (!file) return
+
+  // Prefer Data URL to ensure preview renders consistently across environments.
+  if (typeof FileReader !== 'undefined') {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        pickedPhotoUrl.value = reader.result
+      }
+    }
+    reader.onerror = () => {
+      pickedPhotoObjectUrl.value = URL.createObjectURL(file)
+      pickedPhotoUrl.value = pickedPhotoObjectUrl.value
+    }
+    reader.readAsDataURL(file)
+    return
+  }
+
+  pickedPhotoObjectUrl.value = URL.createObjectURL(file)
+  pickedPhotoUrl.value = pickedPhotoObjectUrl.value
 }
 
 const onProvinsiChange = async () => {
@@ -167,7 +201,48 @@ const validateForm = () => {
   const required = ['nama', 'nik', 'alamat', 'provinsi_kode', 'kabupaten_kota_kode', 'kecamatan_kode', 'desa_kelurahan_kode']
   const invalid = required.some((key) => !String(form.value[key] ?? '').trim())
   if (invalid) return 'Field bertanda * wajib diisi.'
+
+  const nik = String(form.value.nik ?? '').trim()
+  if (!/^\d{16}$/.test(nik)) {
+    return 'NIK harus 16 digit angka.'
+  }
+
+  const provinsiKode = String(form.value.provinsi_kode ?? '').trim()
+  const kabupatenKode = String(form.value.kabupaten_kota_kode ?? '').trim()
+  const kecamatanKode = String(form.value.kecamatan_kode ?? '').trim()
+  const desaKode = String(form.value.desa_kelurahan_kode ?? '').trim()
+
+  if (!/^\d{2}$/.test(provinsiKode)) return 'Kode provinsi harus 2 digit.'
+  if (!/^\d{4}$/.test(kabupatenKode)) return 'Kode kabupaten/kota harus 4 digit.'
+  if (!/^\d{6}$/.test(kecamatanKode)) return 'Kode kecamatan harus 6 digit.'
+  if (!/^\d{10}$/.test(desaKode)) return 'Kode desa/kelurahan harus 10 digit.'
+
+  if (!kabupatenKode.startsWith(provinsiKode)) {
+    return 'Kode kabupaten/kota tidak sesuai provinsi.'
+  }
+  if (!kecamatanKode.startsWith(kabupatenKode)) {
+    return 'Kode kecamatan tidak sesuai kabupaten/kota.'
+  }
+  if (!desaKode.startsWith(kecamatanKode)) {
+    return 'Kode desa/kelurahan tidak sesuai kecamatan.'
+  }
+
+  const hp = String(form.value.hp ?? '').trim()
+  if (hp && !/^\+?[0-9]{8,15}$/.test(hp)) {
+    return 'No. HP harus berupa 8-15 digit angka (boleh diawali +).'
+  }
+
   return ''
+}
+
+const ensureNikNotDuplicate = async (nik, currentId = '') => {
+  const rows = await realErpService.getFarmers(nik)
+  if (!Array.isArray(rows)) return
+
+  const duplicate = rows.find((item) => String(item?.nik ?? '').trim() === nik && String(item?.id ?? '') !== String(currentId ?? ''))
+  if (duplicate) {
+    throw new Error('NIK petani sudah terdaftar. Gunakan NIK lain.')
+  }
 }
 
 const submitForm = async () => {
@@ -183,15 +258,24 @@ const submitForm = async () => {
   error.value = ''
 
   try {
+    const hp = form.value.hp.trim()
+    const nik = form.value.nik.trim()
+
+    // Prevent common 422 from duplicate NIK before POST/PUT request.
+    await ensureNikNotDuplicate(nik, props.mode === 'edit' ? props.id : '')
+
     const payload = {
       nama: form.value.nama.trim(),
-      nik: form.value.nik.trim(),
+      nik,
       alamat: form.value.alamat.trim(),
-      hp: form.value.hp.trim(),
       provinsi_kode: form.value.provinsi_kode,
       kabupaten_kota_kode: form.value.kabupaten_kota_kode,
       kecamatan_kode: form.value.kecamatan_kode,
       desa_kelurahan_kode: form.value.desa_kelurahan_kode,
+    }
+
+    if (hp) {
+      payload.hp = hp
     }
 
     let saved = null
@@ -222,6 +306,11 @@ const goBack = () => {
 }
 
 onMounted(initPage)
+onUnmounted(() => {
+  if (pickedPhotoObjectUrl.value) {
+    URL.revokeObjectURL(pickedPhotoObjectUrl.value)
+  }
+})
 </script>
 
 <template>

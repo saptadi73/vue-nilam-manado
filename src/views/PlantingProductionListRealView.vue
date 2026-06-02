@@ -11,6 +11,8 @@ import { realErpService } from '@/services/realErpService'
 import { useToast } from '@/composables/useToast'
 import { fmtNumber } from '@/utils/formatters'
 
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
@@ -229,8 +231,18 @@ const deleteNote = async (note) => {
 
 const submitNote = async () => {
   if (!selectedForNote.value?.id) return
+  if (!ISO_DATE_REGEX.test(String(noteForm.value.tanggal ?? '').trim())) {
+    noteError.value = 'Tanggal catatan wajib format YYYY-MM-DD.'
+    return
+  }
+
   if (!String(noteForm.value.catatan ?? '').trim()) {
     noteError.value = 'Catatan wajib diisi.'
+    return
+  }
+
+  if (String(noteForm.value.catatan ?? '').trim().length > 2000) {
+    noteError.value = 'Catatan maksimal 2000 karakter.'
     return
   }
 

@@ -11,6 +11,8 @@ import { useToast } from '@/composables/useToast'
 import { fmtCurrency, fmtNumber } from '@/utils/formatters'
 
 const toast = useToast()
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const loading = ref(false)
 const error = ref('')
@@ -170,22 +172,67 @@ const onOverlayClose = (event) => {
   if (event.target === event.currentTarget) closeForm()
 }
 
+const validateForm = () => {
+  const nama = String(form.value.nama ?? '').trim()
+  const tanggal = String(form.value.tanggal ?? '').trim()
+  const petaniId = String(form.value.petani_id ?? '').trim()
+  const produkId = String(form.value.produk_id ?? '').trim()
+  const harga = Number(form.value.harga)
+  const quantity = Number(form.value.quantity)
+
+  if (!nama) return 'Nama expense wajib diisi.'
+  if (nama.length > 150) return 'Nama expense maksimal 150 karakter.'
+  if (!ISO_DATE_REGEX.test(tanggal)) return 'Tanggal expense wajib format YYYY-MM-DD.'
+  if (!petaniId) return 'Petani wajib dipilih.'
+  if (!produkId) return 'Produk pembiayaan wajib dipilih.'
+  if (!Number.isFinite(harga) || harga < 0) return 'Harga harus angka dan tidak boleh negatif.'
+  if (!Number.isFinite(quantity) || quantity <= 0) return 'Quantity harus lebih dari 0.'
+
+  if (!farmers.value.some((item) => item.id === petaniId)) {
+    return 'Petani tidak valid. Silakan pilih ulang.'
+  }
+
+  if (!products.value.some((item) => item.id === produkId)) {
+    return 'Produk pembiayaan tidak valid. Silakan pilih ulang.'
+  }
+
+  const plantingId = String(form.value.planting_production_id ?? '').trim()
+  const oilId = String(form.value.oil_production_id ?? '').trim()
+
+  if (plantingId && !UUID_REGEX.test(plantingId)) {
+    return 'Planting production ID harus format UUID yang valid.'
+  }
+
+  if (oilId && !UUID_REGEX.test(oilId)) {
+    return 'Oil production ID harus format UUID yang valid.'
+  }
+
+  return ''
+}
+
 const saveItem = async () => {
+  const validationError = validateForm()
+  if (validationError) {
+    formError.value = validationError
+    toast.error(validationError)
+    return
+  }
+
   saving.value = true
   formError.value = ''
 
   try {
     const payload = {
-      nama: form.value.nama,
-      tanggal: form.value.tanggal,
-      deskripsi: form.value.deskripsi || null,
-      produk_id: form.value.produk_id,
+      nama: String(form.value.nama ?? '').trim(),
+      tanggal: String(form.value.tanggal ?? '').trim(),
+      deskripsi: String(form.value.deskripsi ?? '').trim() || null,
+      produk_id: String(form.value.produk_id ?? '').trim(),
       harga: Number(form.value.harga),
       quantity: Number(form.value.quantity),
-      petani_id: form.value.petani_id,
-      planting_production_id: form.value.planting_production_id || null,
-      oil_production_id: form.value.oil_production_id || null,
-      paid_by: form.value.paid_by || null,
+      petani_id: String(form.value.petani_id ?? '').trim(),
+      planting_production_id: String(form.value.planting_production_id ?? '').trim() || null,
+      oil_production_id: String(form.value.oil_production_id ?? '').trim() || null,
+      paid_by: String(form.value.paid_by ?? '').trim() || null,
     }
 
     if (form.value.id) {

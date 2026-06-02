@@ -21,6 +21,8 @@ const props = defineProps({
 
 const router = useRouter()
 const toast = useToast()
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_REGEX = /^\+?[0-9]{8,15}$/
 
 const loading = ref(false)
 const saving = ref(false)
@@ -122,7 +124,62 @@ const initPage = async () => {
   }
 }
 
+const validateForm = () => {
+  const nama = String(form.value.nama ?? '').trim()
+  const alamat = String(form.value.alamat ?? '').trim()
+  const hp = String(form.value.hp ?? '').trim()
+  const email = String(form.value.email ?? '').trim()
+  const web = String(form.value.web ?? '').trim()
+
+  if (!nama) return 'Nama mitra wajib diisi.'
+  if (nama.length > 150) return 'Nama mitra maksimal 150 karakter.'
+  if (!alamat) return 'Alamat mitra wajib diisi.'
+  if (alamat.length > 255) return 'Alamat mitra maksimal 255 karakter.'
+
+  if (hp && !PHONE_REGEX.test(hp)) {
+    return 'Nomor HP harus 8-15 digit angka (boleh diawali +).'
+  }
+
+  if (email && !EMAIL_REGEX.test(email)) {
+    return 'Format email tidak valid.'
+  }
+
+  if (web) {
+    try {
+      const parsed = new URL(web)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return 'Website harus menggunakan http atau https.'
+      }
+    } catch {
+      return 'Format website tidak valid.'
+    }
+  }
+
+  const provinsiKode = String(form.value.provinsi_kode ?? '').trim()
+  const kabupatenKode = String(form.value.kabupaten_kota_kode ?? '').trim()
+  const kecamatanKode = String(form.value.kecamatan_kode ?? '').trim()
+
+  if (!provinsiKode || !kabupatenKode || !kecamatanKode) {
+    return 'Wilayah mitra (provinsi, kabupaten/kota, kecamatan) wajib diisi.'
+  }
+
+  if (!/^\d{2}$/.test(provinsiKode)) return 'Kode provinsi harus 2 digit.'
+  if (!/^\d{4}$/.test(kabupatenKode)) return 'Kode kabupaten/kota harus 4 digit.'
+  if (!/^\d{6}$/.test(kecamatanKode)) return 'Kode kecamatan harus 6 digit.'
+  if (!kabupatenKode.startsWith(provinsiKode)) return 'Kode kabupaten/kota tidak sesuai provinsi.'
+  if (!kecamatanKode.startsWith(kabupatenKode)) return 'Kode kecamatan tidak sesuai kabupaten/kota.'
+
+  return ''
+}
+
 const submitForm = async () => {
+  const validationError = validateForm()
+  if (validationError) {
+    error.value = validationError
+    toast.error(validationError)
+    return
+  }
+
   saving.value = true
   error.value = ''
 

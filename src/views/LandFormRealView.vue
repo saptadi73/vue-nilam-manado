@@ -7,7 +7,8 @@ import DataToolbar from '@/components/DataToolbar.vue'
 import ListLoadingState from '@/components/ListLoadingState.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { useToast } from '@/composables/useToast'
-import { realErpService } from '@/services/realErpService'
+import { appConfig } from '@/config/env'
+import { realErpService, toAbsoluteUrl } from '@/services/realErpService'
 
 const props = defineProps({
   mode: { type: String, default: 'create' },
@@ -19,13 +20,20 @@ const router = useRouter()
 const toast = useToast()
 
 const ownerIdFromQuery = String(route.query.pemilik_id ?? '').trim()
+const LAND_OWNERSHIP_OPTIONS = ['hak milik', 'sewa', 'pinjam']
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
 
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
+const landData = ref(null)
 const owner = ref(null)
 const photoFile = ref(null)
+const pickedPhotoUrl = ref('')
+const pickedPhotoObjectUrl = ref('')
 const farmers = ref([])
+const defaultPhoto = appConfig.defaultFarmerPhotoUrl
 
 const provinsiOptions = ref([])
 const kabupatenOptions = ref([])
@@ -72,6 +80,11 @@ const validPolygonPoints = computed(() =>
 )
 
 const showMap = computed(() => validPolygonPoints.value.length >= 3)
+const currentPhotoUrl = computed(() => {
+  if (pickedPhotoUrl.value) return pickedPhotoUrl.value
+  if (landData.value?.foto_url) return toAbsoluteUrl(landData.value.foto_url)
+  return defaultPhoto
+})
 
 const isReadOnly = computed(() => props.mode === 'detail')
 const pageTitle = computed(() => {
@@ -113,6 +126,7 @@ const loadLandDetail = async () => {
   if (!props.id) throw new Error('ID lahan tidak ditemukan untuk mode ini.')
 
   const land = await realErpService.getLandById(props.id)
+  landData.value = land
   form.value = {
     kode: land?.kode ?? '',
     luas: String(land?.luas ?? ''),
@@ -237,7 +251,51 @@ const onKecamatanChange = async () => {
 
 const onPickPhoto = (event) => {
   const [file] = event?.target?.files ?? []
-  photoFile.value = file ?? null
+
+  if (pickedPhotoObjectUrl.value) {
+    URL.revokeObjectURL(pickedPhotoObjectUrl.value)
+    pickedPhotoObjectUrl.value = ''
+  }
+  pickedPhotoUrl.value = ''
+
+  if (!file) {
+    photoFile.value = null
+    return
+  }
+
+  if (!IMAGE_MIME_TYPES.includes(file.type)) {
+    toast.error('Format foto lahan harus JPG, PNG, atau WEBP.')
+    photoFile.value = null
+    event.target.value = ''
+    return
+  }
+
+  if (file.size > MAX_PHOTO_SIZE_BYTES) {
+    toast.error('Ukuran foto lahan maksimal 5MB.')
+    photoFile.value = null
+    event.target.value = ''
+    return
+  }
+
+  photoFile.value = file
+
+  if (typeof FileReader !== 'undefined') {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        pickedPhotoUrl.value = reader.result
+      }
+    }
+    reader.onerror = () => {
+      pickedPhotoObjectUrl.value = URL.createObjectURL(file)
+      pickedPhotoUrl.value = pickedPhotoObjectUrl.value
+    }
+    reader.readAsDataURL(file)
+    return
+  }
+
+  pickedPhotoObjectUrl.value = URL.createObjectURL(file)
+  pickedPhotoUrl.value = pickedPhotoObjectUrl.value
 }
 
 const addCoordinateRow = () => {
@@ -329,6 +387,16 @@ watch(
 )
 
 const buildCoordinates = () => {
+  const hasIncomplete = coordinateRows.value.some((row) => {
+    const hasLat = String(row.latitude).trim() !== ''
+    const hasLng = String(row.longitude).trim() !== ''
+    return (hasLat || hasLng) && !(hasLat && hasLng)
+  })
+
+  if (hasIncomplete) {
+    throw new Error('Setiap titik koordinat harus memiliki latitude dan longitude sekaligus.')
+  }
+
   const validRows = coordinateRows.value
     .map((row, index) => ({
       latitude: Number(row.latitude),
@@ -341,25 +409,88 @@ const buildCoordinates = () => {
     throw new Error('Jika mengisi koordinat polygon, minimal 3 titik harus valid.')
   }
 
+  const hasOutOfRange = validRows.some((row) => row.latitude < -90 || row.latitude > 90 || row.longitude < -180 || row.longitude > 180)
+  if (hasOutOfRange) {
+    throw new Error('Latitude harus antara -90 sampai 90, dan longitude antara -180 sampai 180.')
+  }
+
   return validRows
+}
+
+const validateRegionHierarchy = () => {
+  const provinsiKode = String(form.value.provinsi_kode ?? '').trim()
+  const kabupatenKode = String(form.value.kabupaten_kota_kode ?? '').trim()
+  const kecamatanKode = String(form.value.kecamatan_kode ?? '').trim()
+  const desaKode = String(form.value.desa_kelurahan_kode ?? '').trim()
+  const filledCount = [provinsiKode, kabupatenKode, kecamatanKode, desaKode].filter(Boolean).length
+
+  if (filledCount === 0) return ''
+  if (filledCount < 4) return 'Jika mengisi wilayah lahan, isi lengkap dari provinsi sampai desa/kelurahan.'
+
+  if (!/^\d{2}$/.test(provinsiKode)) return 'Kode provinsi lahan harus 2 digit.'
+  if (!/^\d{4}$/.test(kabupatenKode)) return 'Kode kabupaten/kota lahan harus 4 digit.'
+  if (!/^\d{6}$/.test(kecamatanKode)) return 'Kode kecamatan lahan harus 6 digit.'
+  if (!/^\d{10}$/.test(desaKode)) return 'Kode desa/kelurahan lahan harus 10 digit.'
+
+  if (!kabupatenKode.startsWith(provinsiKode)) return 'Kode kabupaten/kota lahan tidak sesuai provinsi.'
+  if (!kecamatanKode.startsWith(kabupatenKode)) return 'Kode kecamatan lahan tidak sesuai kabupaten/kota.'
+  if (!desaKode.startsWith(kecamatanKode)) return 'Kode desa/kelurahan lahan tidak sesuai kecamatan.'
+
+  return ''
+}
+
+const validateForm = () => {
+  const kode = String(form.value.kode ?? '').trim()
+  if (!kode) return 'Kode lahan wajib diisi.'
+  if (kode.length > 50) return 'Kode lahan maksimal 50 karakter.'
+
+  if (!form.value.pemilik_id) return 'Pemilik lahan wajib dipilih.'
+
+  const luas = Number(form.value.luas)
+  if (!Number.isFinite(luas) || luas <= 0) return 'Luas lahan harus lebih dari 0.'
+
+  if (!LAND_OWNERSHIP_OPTIONS.includes(form.value.kepemilikan)) {
+    return 'Kepemilikan harus salah satu dari: hak milik, sewa, pinjam.'
+  }
+
+  const elevasiRaw = String(form.value.elevasi ?? '').trim()
+  if (elevasiRaw) {
+    const elevasi = Number(elevasiRaw)
+    if (!Number.isFinite(elevasi)) return 'Elevasi harus berupa angka.'
+  }
+
+  return validateRegionHierarchy()
+}
+
+const ensureLandCodeNotDuplicate = async (kode, currentId = '') => {
+  const rows = await realErpService.getLands({ search: kode })
+  if (!Array.isArray(rows)) return
+
+  const duplicate = rows.find((item) => String(item?.kode ?? '').trim().toLowerCase() === kode.toLowerCase() && String(item?.id ?? '') !== String(currentId ?? ''))
+  if (duplicate) {
+    throw new Error('Kode lahan sudah terdaftar. Gunakan kode lain.')
+  }
 }
 
 const submitForm = async () => {
   if (isReadOnly.value) return
 
+  const validationError = validateForm()
+  if (validationError) {
+    toast.error(validationError)
+    return
+  }
+
   saving.value = true
   error.value = ''
   try {
-    if (!form.value.kode.trim()) throw new Error('Kode lahan wajib diisi.')
-    if (!form.value.pemilik_id) throw new Error('Pemilik lahan wajib dipilih.')
+    const kode = form.value.kode.trim()
+    await ensureLandCodeNotDuplicate(kode, props.mode === 'edit' ? props.id : '')
 
     const luas = Number(form.value.luas)
-    if (!Number.isFinite(luas) || luas <= 0) {
-      throw new Error('Luas lahan harus lebih dari 0.')
-    }
 
     const payload = {
-      kode: form.value.kode.trim(),
+      kode,
       luas,
       kepemilikan: form.value.kepemilikan,
       pemilik_id: form.value.pemilik_id,
@@ -399,7 +530,12 @@ const submitForm = async () => {
 }
 
 onMounted(init)
-onUnmounted(destroyMap)
+onUnmounted(() => {
+  destroyMap()
+  if (pickedPhotoObjectUrl.value) {
+    URL.revokeObjectURL(pickedPhotoObjectUrl.value)
+  }
+})
 </script>
 
 <template>
@@ -493,6 +629,17 @@ onUnmounted(destroyMap)
           <input class="field w-full" type="file" accept="image/png,image/jpeg,image/webp" @change="onPickPhoto" />
           <p v-if="photoFile" class="text-xs text-emerald-100/70">File dipilih: {{ photoFile.name }}</p>
         </label>
+
+        <div class="md:col-span-2">
+          <p class="mb-2 text-sm text-emerald-100/85">Preview Foto Lahan</p>
+          <div class="lg:flex lg:justify-center">
+            <img
+              :src="currentPhotoUrl"
+              alt="Preview foto lahan"
+              class="h-48 w-full rounded-xl border border-white/10 object-cover sm:h-56 md:h-64 lg:h-64 lg:w-64 xl:h-72 xl:w-72"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="mt-5 space-y-3">
@@ -508,8 +655,8 @@ onUnmounted(destroyMap)
             class="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-3"
           >
             <span class="w-5 shrink-0 text-center text-xs font-bold text-emerald-100/50">{{ index + 1 }}</span>
-            <input v-model="row.latitude" class="field min-w-[7rem] flex-1" type="number" step="0.000001" placeholder="Latitude" :disabled="isReadOnly" />
-            <input v-model="row.longitude" class="field min-w-[7rem] flex-1" type="number" step="0.000001" placeholder="Longitude" :disabled="isReadOnly" />
+            <input v-model="row.latitude" class="field min-w-28 flex-1" type="number" step="0.000001" placeholder="Latitude" :disabled="isReadOnly" />
+            <input v-model="row.longitude" class="field min-w-28 flex-1" type="number" step="0.000001" placeholder="Longitude" :disabled="isReadOnly" />
             <template v-if="!isReadOnly">
               <button
                 type="button"

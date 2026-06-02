@@ -42,6 +42,20 @@ const goBack = () => {
   router.push('/real/produk-biaya')
 }
 
+const validateForm = () => {
+  const nama = String(form.value.nama ?? '').trim()
+  const satuan = String(form.value.satuan ?? '').trim()
+  const harga = Number(form.value.harga)
+
+  if (!nama) return 'Nama produk wajib diisi.'
+  if (nama.length > 150) return 'Nama produk maksimal 150 karakter.'
+  if (!Number.isFinite(harga) || harga < 0) return 'Harga harus angka dan tidak boleh negatif.'
+  if (!satuan) return 'Satuan wajib diisi.'
+  if (satuan.length > 30) return 'Satuan maksimal 30 karakter.'
+
+  return ''
+}
+
 const loadDetail = async () => {
   if (props.mode !== 'edit' || !props.id) return
 
@@ -63,6 +77,13 @@ const loadDetail = async () => {
 }
 
 const submitForm = async () => {
+  const validationError = validateForm()
+  if (validationError) {
+    error.value = validationError
+    toast.error(validationError)
+    return
+  }
+
   saving.value = true
   error.value = ''
 

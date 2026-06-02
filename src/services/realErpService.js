@@ -2,6 +2,9 @@ import { clearAccessToken, getAccessToken, getLoggedInUserId, markSessionExpired
 import { appConfig } from '@/config/env'
 
 const API_BASE_URL = appConfig.apiBaseUrl
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const isUuid = (value) => UUID_REGEX.test(String(value ?? '').trim())
 
 const isWrappedResponse = (payload) => {
   if (!payload || typeof payload !== 'object') return false
@@ -16,7 +19,27 @@ const unwrapData = (payload) => {
 const getErrorMessage = (payload, fallback) => {
   if (!payload) return fallback
   if (typeof payload === 'string') return payload
-  if (typeof payload === 'object' && typeof payload.message === 'string') return payload.message
+  if (typeof payload === 'object') {
+    const message = typeof payload.message === 'string' ? payload.message : ''
+    const detail = typeof payload.detail === 'string' ? payload.detail : ''
+    const errors = payload.errors
+
+    if (errors && typeof errors === 'object' && !Array.isArray(errors)) {
+      const firstField = Object.keys(errors)[0]
+      const firstValue = firstField ? errors[firstField] : null
+      const firstIssue = Array.isArray(firstValue) ? firstValue[0] : firstValue
+      const issueText = typeof firstIssue === 'string' ? firstIssue : ''
+
+      if (issueText) {
+        if (message) return `${message}: ${issueText}`
+        if (detail) return `${detail}: ${issueText}`
+        return issueText
+      }
+    }
+
+    if (message) return message
+    if (detail) return detail
+  }
   return fallback
 }
 
@@ -41,7 +64,7 @@ const withUserUpdate = (payload) => {
   if (!payload || typeof payload !== 'object') return payload
 
   const userId = getLoggedInUserId()
-  if (!userId) return payload
+  if (!isUuid(userId)) return payload
   if (payload.user_update) return payload
 
   return {
@@ -54,7 +77,7 @@ const withUserUpdateId = (payload) => {
   if (!payload || typeof payload !== 'object') return payload
 
   const userId = getLoggedInUserId()
-  if (!userId) return payload
+  if (!isUuid(userId)) return payload
   if (payload.user_update_id) return payload
 
   return {
@@ -65,12 +88,12 @@ const withUserUpdateId = (payload) => {
 
 const withUserUpdateQuery = (query = {}) => {
   const userId = getLoggedInUserId()
-  if (!userId) return query
-  if (query.user_update) return query
+  if (!isUuid(userId)) return query
+  if (query.user_update_id || query.user_update) return query
 
   return {
     ...query,
-    user_update: userId,
+    user_update_id: userId,
   }
 }
 
@@ -349,11 +372,11 @@ export const realErpService = {
   },
 
   async createFarmer(payload) {
-    return request('/farmers', { method: 'POST', body: withUserUpdate(payload) })
+    return request('/farmers', { method: 'POST', body: withUserUpdateId(payload) })
   },
 
   async updateFarmer(id, payload) {
-    return request(`/farmers/${id}`, { method: 'PUT', body: withUserUpdate(payload) })
+    return request(`/farmers/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
   },
 
   async deleteFarmer(id) {
