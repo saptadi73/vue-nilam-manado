@@ -431,7 +431,7 @@ const exportCsv = () => {
       </select>
       <select v-model="landFilter" class="field w-full" :disabled="!farmerFilter">
         <option value="">Semua Lahan</option>
-        <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} ha</option>
+        <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} M²</option>
       </select>
 
       <select v-model.number="pageSize" class="field w-full">
@@ -492,7 +492,7 @@ const exportCsv = () => {
         <div class="mt-4 grid grid-cols-1 gap-2 text-xs text-emerald-100/90 sm:grid-cols-2">
           <p class="rounded-lg bg-black/20 px-3 py-2">Mulai: {{ item.tanggal_mulai || '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Selesai: {{ item.aktual_tanggal_akhir || item.tanggal_akhir || '-' }}</p>
-          <p class="rounded-lg bg-black/20 px-3 py-2">Luas Garapan: {{ item.luas_garapan ?? '-' }} ha</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Luas Garapan: {{ item.luas_garapan ?? '-' }} M²</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Hasil Basah: {{ fmtNumber(item.aktual_hasil_produksi_basah ?? item.hasil_produksi_basah ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2 sm:col-span-2">Hasil Kering: {{ fmtNumber(item.aktual_hasil_produksi_kering ?? 0) }} kg</p>
         </div>
@@ -557,7 +557,7 @@ const exportCsv = () => {
           <p class="rounded-lg bg-black/20 px-3 py-2">Aktual Akhir: {{ selectedItem.aktual_tanggal_akhir || '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Petani: {{ selectedItem.petani?.nama || selectedItem.petani_nama || selectedItem.petani_id || '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Lahan: {{ selectedItem.lahan?.kode || selectedItem.lahan_kode || selectedItem.lahan_id || '-' }}</p>
-          <p class="rounded-lg bg-black/20 px-3 py-2">Luas Garapan: {{ selectedItem.luas_garapan ?? '-' }} ha</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Luas Garapan: {{ selectedItem.luas_garapan ?? '-' }} M²</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Jumlah Batang: {{ selectedItem.jumlah_batang ?? '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Basah (target): {{ fmtNumber(selectedItem.hasil_produksi_basah ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Basah (aktual): {{ fmtNumber(selectedItem.aktual_hasil_produksi_basah ?? 0) }} kg</p>

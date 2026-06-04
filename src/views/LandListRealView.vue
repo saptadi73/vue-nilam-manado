@@ -164,7 +164,7 @@ onMounted(loadLands)
         </div>
 
         <div class="mt-4 grid gap-2 text-xs text-emerald-100/90">
-          <p class="rounded-lg bg-black/20 px-3 py-2">Luas: {{ land.luas ?? '-' }} ha</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Luas: {{ land.luas ?? '-' }} M²</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Elevasi: {{ land.elevasi ?? '-' }} mdpl</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Kepemilikan: {{ land.kepemilikan || '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Kab/Kota: {{ land.kabupaten_kota || '-' }}</p>

@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import MetricCard from '@/components/MetricCard.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import GlassPanel from '@/components/GlassPanel.vue'
-import VueApexCharts from 'vue3-apexcharts'
+import ApexChartSafe from '@/components/ApexChartSafe.vue'
 import { useErpData } from '@/composables/useErpData'
 import { fmtNumber } from '@/utils/formatters'
 
@@ -145,15 +145,15 @@ const avgRedaman = computed(() => {
 
       <div class="grid gap-5 lg:grid-cols-2">
         <GlassPanel title="Grafik Produksi (kg / bulan)" tight>
-          <VueApexCharts type="bar" height="280" :options="barOptions" :series="productionBar" />
+          <ApexChartSafe type="bar" height="280" :options="barOptions" :series="productionBar" />
         </GlassPanel>
         <GlassPanel title="Grafik Tanam (ha / bulan)" tight>
-          <VueApexCharts type="line" height="280" :options="lineOptions" :series="plantingLine" />
+          <ApexChartSafe type="line" height="280" :options="lineOptions" :series="plantingLine" />
         </GlassPanel>
       </div>
 
       <GlassPanel title="Rata-rata Redaman Tercapai (%)" tight>
-        <VueApexCharts type="area" height="280" :options="areaOptions" :series="absorbArea" />
+        <ApexChartSafe type="area" height="280" :options="areaOptions" :series="absorbArea" />
       </GlassPanel>
 
       <div class="grid gap-4 lg:grid-cols-2">

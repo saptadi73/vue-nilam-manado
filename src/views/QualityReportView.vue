@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import GlassPanel from '@/components/GlassPanel.vue'
-import VueApexCharts from 'vue3-apexcharts'
+import ApexChartSafe from '@/components/ApexChartSafe.vue'
 import { useErpData } from '@/composables/useErpData'
 
 const { data, loading, error, refresh } = useErpData((service) => service.getQualityReport())
@@ -171,11 +171,11 @@ const paChartSeries = computed(() => [
 
     <template v-else>
       <GlassPanel title="Kualitas berdasarkan Kota/Kabupaten" tight>
-        <VueApexCharts type="bar" height="300" :options="regionOptions" :series="regionSeries" />
+        <ApexChartSafe type="bar" height="300" :options="regionOptions" :series="regionSeries" />
       </GlassPanel>
 
       <GlassPanel title="Tren Kualitas vs Target (Berdasarkan Tanggal/Bulan)" tight>
-        <VueApexCharts type="line" height="300" :options="timelineOptions" :series="timelineSeries" />
+        <ApexChartSafe type="line" height="300" :options="timelineOptions" :series="timelineSeries" />
       </GlassPanel>
 
       <GlassPanel title="Laporan Pengukuran Kadar PA Patchouli Alcohol (%) - Rata-rata Bulan ke Bulan" tight>
@@ -194,7 +194,7 @@ const paChartSeries = computed(() => [
           </div>
         </div>
 
-        <VueApexCharts type="line" height="320" :options="paOptions" :series="paChartSeries" />
+        <ApexChartSafe type="line" height="320" :options="paOptions" :series="paChartSeries" />
       </GlassPanel>
 
       <GlassPanel title="Ringkasan per Petani" tight>

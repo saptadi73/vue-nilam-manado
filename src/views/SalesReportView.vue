@@ -4,7 +4,7 @@ import MetricCard from '@/components/MetricCard.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import GlassPanel from '@/components/GlassPanel.vue'
 import NotificationStack from '@/components/NotificationStack.vue'
-import VueApexCharts from 'vue3-apexcharts'
+import ApexChartSafe from '@/components/ApexChartSafe.vue'
 import { useErpData } from '@/composables/useErpData'
 import { mockErpService } from '@/services/mockErpService'
 import { fmtCurrency, fmtNumber } from '@/utils/formatters'
@@ -189,7 +189,7 @@ const closeOnOverlay = (event, closer) => {
       </div>
 
       <GlassPanel title="Grafik Penjualan (IDR / bulan)" tight>
-        <VueApexCharts type="bar" height="300" :options="salesOptions" :series="salesData" />
+        <ApexChartSafe type="bar" height="300" :options="salesOptions" :series="salesData" />
       </GlassPanel>
 
       <div class="grid gap-4 xl:grid-cols-2">

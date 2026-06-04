@@ -329,7 +329,7 @@ onMounted(init)
           <span>Lahan (opsional)</span>
           <select v-model="form.lahan_id" class="field w-full" :disabled="!form.petani_id">
             <option value="">Tanpa lahan</option>
-            <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} ha</option>
+            <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} M²</option>
           </select>
         </label>
       </div>

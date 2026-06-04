@@ -419,7 +419,7 @@ const exportCsv = () => {
       </select>
       <select v-model="landFilter" class="field w-full" :disabled="!farmerFilter">
         <option value="">Semua Lahan</option>
-        <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} ha</option>
+        <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} M²</option>
       </select>
 
       <select v-model.number="pageSize" class="field w-full">

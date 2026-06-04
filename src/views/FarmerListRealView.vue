@@ -289,7 +289,26 @@ const openLandModal = async (farmer) => {
 
   try {
     const lands = await realErpService.getLands({ pemilik_id: farmer.id })
-    landsByFarmer.value = Array.isArray(lands) ? lands : []
+    const baseLands = Array.isArray(lands) ? lands : []
+
+    const hydratedLands = await Promise.all(
+      baseLands.map(async (land) => {
+        const hasCoordinates = Array.isArray(land?.koordinat) && land.koordinat.length >= 3
+        if (hasCoordinates || !land?.id) return land
+
+        try {
+          const detail = await realErpService.getLandById(land.id)
+          return {
+            ...land,
+            ...(detail && typeof detail === 'object' ? detail : {}),
+          }
+        } catch {
+          return land
+        }
+      }),
+    )
+
+    landsByFarmer.value = hydratedLands
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Gagal memuat data lahan petani.'
     landError.value = message

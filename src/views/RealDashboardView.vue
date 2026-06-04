@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import VueApexCharts from 'vue3-apexcharts'
+import ApexChartSafe from '@/components/ApexChartSafe.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import GlassPanel from '@/components/GlassPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
@@ -262,21 +262,21 @@ const endpointCoverage = computed(() => [
 
       <div class="grid gap-4 xl:grid-cols-2">
         <GlassPanel title="Penjualan vs Expense per Bulan (Mixed Bar + Line)" tight>
-          <VueApexCharts type="line" height="320" :options="salesVsExpenseChartOptions" :series="salesVsExpenseChartSeries" />
+          <ApexChartSafe type="line" height="320" :options="salesVsExpenseChartOptions" :series="salesVsExpenseChartSeries" />
         </GlassPanel>
 
         <GlassPanel title="Distribusi Penjualan per Kabupaten (Pie Chart)" tight>
-          <VueApexCharts type="pie" height="320" :options="regencyPieChartOptions" :series="regencyPieChartSeries" />
+          <ApexChartSafe type="pie" height="320" :options="regencyPieChartOptions" :series="regencyPieChartSeries" />
         </GlassPanel>
       </div>
 
       <div class="grid gap-4 xl:grid-cols-2">
         <GlassPanel title="Total Penjualan per Petani (Bar Chart)" tight>
-          <VueApexCharts type="bar" height="320" :options="farmerSalesBarOptions" :series="farmerSalesBarSeries" />
+          <ApexChartSafe type="bar" height="320" :options="farmerSalesBarOptions" :series="farmerSalesBarSeries" />
         </GlassPanel>
 
         <GlassPanel title="Tren Produksi Tanam vs Minyak (Line Chart)" tight>
-          <VueApexCharts type="line" height="320" :options="productionTrendOptions" :series="productionTrendSeries" />
+          <ApexChartSafe type="line" height="320" :options="productionTrendOptions" :series="productionTrendSeries" />
         </GlassPanel>
       </div>
 

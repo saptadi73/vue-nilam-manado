@@ -331,7 +331,17 @@ onMounted(init)
         </label>
 
         <label class="space-y-1 text-sm text-emerald-100/85">
-          <span>Luas Garapan (ha) *</span>
+          <span>Tanggal Akhir</span>
+          <input v-model="form.tanggal_akhir" class="field w-full" type="date" :disabled="isReadOnly" />
+        </label>
+
+        <label class="space-y-1 text-sm text-emerald-100/85">
+          <span>Aktual Tanggal Akhir</span>
+          <input v-model="form.aktual_tanggal_akhir" class="field w-full" type="date" :disabled="isReadOnly" />
+        </label>
+
+        <label class="space-y-1 text-sm text-emerald-100/85">
+          <span>Luas Garapan (M²) *</span>
           <input v-model="form.luas_garapan" class="field w-full" type="number" min="0" step="0.01" />
         </label>
 
@@ -356,7 +366,7 @@ onMounted(init)
           <span>Lahan (opsional)</span>
           <select v-model="form.lahan_id" class="field w-full" :disabled="!form.petani_id">
             <option value="">Tanpa lahan</option>
-            <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} ha</option>
+            <option v-for="land in lands" :key="land.id" :value="land.id">{{ land.kode }} - {{ land.luas }} M²</option>
           </select>
         </label>
 

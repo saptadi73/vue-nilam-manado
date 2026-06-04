@@ -4,7 +4,7 @@ import MetricCard from '@/components/MetricCard.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import GlassPanel from '@/components/GlassPanel.vue'
 import NotificationStack from '@/components/NotificationStack.vue'
-import VueApexCharts from 'vue3-apexcharts'
+import ApexChartSafe from '@/components/ApexChartSafe.vue'
 import { useErpData } from '@/composables/useErpData'
 import { mockErpService } from '@/services/mockErpService'
 import { fmtNumber } from '@/utils/formatters'
@@ -134,7 +134,7 @@ const closeOnOverlay = (event, closer) => {
       </div>
 
       <GlassPanel title="Flow Traceability Inventory" tight>
-        <VueApexCharts type="bar" height="310" :options="inventoryOptions" :series="inventorySeries" />
+        <ApexChartSafe type="bar" height="310" :options="inventoryOptions" :series="inventorySeries" />
       </GlassPanel>
 
       <GlassPanel title="Batch Penerimaan Terbaru (RO)" tight>

@@ -21,6 +21,149 @@ let mapInstance = null
 let polygonLayer = null
 let pointMarkers = []
 
+const toFiniteNumber = (value) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string') {
+    const normalized = value.trim().replace(',', '.')
+    if (!normalized) return null
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+const normalizeLatLng = (latValue, lngValue) => {
+  const lat = toFiniteNumber(latValue)
+  const lng = toFiniteNumber(lngValue)
+  if (lat === null || lng === null) return null
+
+  const isLatLngValid = Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  if (isLatLngValid) return { latitude: lat, longitude: lng }
+
+  const isLngLatValid = Math.abs(lng) <= 90 && Math.abs(lat) <= 180
+  if (isLngLatValid) return { latitude: lng, longitude: lat }
+
+  return null
+}
+
+const extractCoordinateSource = (rawCoordinates) => {
+  if (Array.isArray(rawCoordinates)) return rawCoordinates
+
+  if (rawCoordinates && typeof rawCoordinates === 'object') {
+    if (rawCoordinates.type === 'Feature' && rawCoordinates.geometry) {
+      return extractCoordinateSource(rawCoordinates.geometry)
+    }
+
+    if (rawCoordinates.type === 'Polygon' && Array.isArray(rawCoordinates.coordinates)) {
+      return Array.isArray(rawCoordinates.coordinates[0]) ? rawCoordinates.coordinates[0] : []
+    }
+
+    if (Array.isArray(rawCoordinates.coordinates)) return rawCoordinates.coordinates
+    if (Array.isArray(rawCoordinates.koordinat)) return rawCoordinates.koordinat
+    if (Array.isArray(rawCoordinates.points)) return rawCoordinates.points
+  }
+
+  if (typeof rawCoordinates === 'string') {
+    try {
+      const parsed = JSON.parse(rawCoordinates)
+      return extractCoordinateSource(parsed)
+    } catch {
+      return []
+    }
+  }
+
+  return []
+}
+
+const resolveLandCoordinatePayload = (land) => {
+  if (!land || typeof land !== 'object') return []
+
+  const candidates = [
+    land.koordinat,
+    land.coordinates,
+    land.land_coordinates,
+    land.polygon,
+    land.area_polygon,
+    land.areaPolygon,
+  ]
+
+  for (const candidate of candidates) {
+    const source = extractCoordinateSource(candidate)
+    if (Array.isArray(source) && source.length) return source
+  }
+
+  return []
+}
+
+const normalizeCoordinatePoints = (rawCoordinates) => {
+  const source = extractCoordinateSource(rawCoordinates)
+  if (!Array.isArray(source)) return []
+
+  return source
+    .map((point, index) => {
+      if (Array.isArray(point)) {
+        const normalized = normalizeLatLng(point[0], point[1])
+        return {
+          latitude: normalized?.latitude ?? null,
+          longitude: normalized?.longitude ?? null,
+          urutan: index + 1,
+        }
+      }
+
+      const normalized = normalizeLatLng(
+        point?.latitude ?? point?.lat,
+        point?.longitude ?? point?.lng ?? point?.lon ?? point?.long,
+      )
+      const urutan = toFiniteNumber(point?.urutan ?? point?.order ?? point?.sequence ?? point?.no)
+
+      return {
+        id: point?.id,
+        latitude: normalized?.latitude ?? null,
+        longitude: normalized?.longitude ?? null,
+        urutan: urutan ?? index + 1,
+      }
+    })
+    .filter((point) => point.latitude !== null && point.longitude !== null)
+    .sort((a, b) => Number(a.urutan) - Number(b.urutan))
+}
+
+const EARTH_RADIUS_METERS = 6371008.8
+
+const calculatePolygonAreaM2 = (polygon) => {
+  if (!Array.isArray(polygon) || polygon.length < 3) return null
+
+  const lat0 = polygon.reduce((sum, point) => sum + point[0], 0) / polygon.length
+  const lat0Rad = (lat0 * Math.PI) / 180
+
+  const projected = polygon.map((point) => {
+    const latRad = (point[0] * Math.PI) / 180
+    const lngRad = (point[1] * Math.PI) / 180
+    return {
+      x: EARTH_RADIUS_METERS * lngRad * Math.cos(lat0Rad),
+      y: EARTH_RADIUS_METERS * latRad,
+    }
+  })
+
+  let sum = 0
+  for (let i = 0; i < projected.length; i += 1) {
+    const current = projected[i]
+    const next = projected[(i + 1) % projected.length]
+    sum += current.x * next.y - next.x * current.y
+  }
+
+  const areaSqMeters = Math.abs(sum) / 2
+  return Number.isFinite(areaSqMeters) ? areaSqMeters : null
+}
+
+const formatAreaM2 = (value) => {
+  if (!Number.isFinite(value)) return '-'
+  const digits = value >= 100 ? 0 : 2
+  return value.toLocaleString('id-ID', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
+}
+
 const availableLands = computed(() => (Array.isArray(props.lands) ? props.lands : []))
 
 const selectedLand = computed(() => {
@@ -30,10 +173,7 @@ const selectedLand = computed(() => {
 })
 
 const orderedCoordinates = computed(() => {
-  const points = Array.isArray(selectedLand.value?.koordinat) ? [...selectedLand.value.koordinat] : []
-  return points
-    .sort((a, b) => Number(a?.urutan ?? 0) - Number(b?.urutan ?? 0))
-    .filter((point) => Number.isFinite(Number(point?.latitude)) && Number.isFinite(Number(point?.longitude)))
+  return normalizeCoordinatePoints(resolveLandCoordinatePayload(selectedLand.value))
 })
 
 const centroidCoordinate = computed(() => {
@@ -60,12 +200,15 @@ const googleMapsUrl = computed(() => {
   return `https://www.google.com/maps?q=${centroidCoordinate.value.lat},${centroidCoordinate.value.lng}`
 })
 
+const estimatedPolygonAreaM2 = computed(() => calculatePolygonAreaM2(toPolygon(selectedLand.value)))
+const polygonAreaDiffM2 = computed(() => {
+  const actual = Number(selectedLand.value?.luas)
+  if (!Number.isFinite(actual) || !Number.isFinite(estimatedPolygonAreaM2.value)) return null
+  return estimatedPolygonAreaM2.value - actual
+})
+
 const toPolygon = (land) => {
-  const points = Array.isArray(land?.koordinat) ? [...land.koordinat] : []
-  return points
-    .sort((a, b) => Number(a?.urutan ?? 0) - Number(b?.urutan ?? 0))
-    .map((point) => [Number(point?.latitude), Number(point?.longitude)])
-    .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]))
+  return normalizeCoordinatePoints(resolveLandCoordinatePayload(land)).map((point) => [point.latitude, point.longitude])
 }
 
 const destroyMap = () => {
@@ -202,18 +345,22 @@ const fmtCoord = (value) => Number(value).toFixed(6)
                 <span>Pilih Lahan</span>
                 <select v-model="selectedLandId" class="field w-full">
                   <option v-for="land in availableLands" :key="land.id" :value="land.id">
-                    {{ land.kode }} - {{ land.luas }} ha
+                    {{ land.kode }} - {{ land.luas }} M²
                   </option>
                 </select>
               </label>
 
               <div class="space-y-2 text-xs text-emerald-100/85">
                 <p class="rounded-lg bg-black/20 px-3 py-2">Kode: {{ selectedLand?.kode || '-' }}</p>
-                <p class="rounded-lg bg-black/20 px-3 py-2">Luas: {{ selectedLand?.luas ?? '-' }} ha</p>
+                <p class="rounded-lg bg-black/20 px-3 py-2">Luas: {{ selectedLand?.luas ?? '-' }} M²</p>
+                <p class="rounded-lg bg-black/20 px-3 py-2">Estimasi luas polygon: {{ formatAreaM2(estimatedPolygonAreaM2) }} M²</p>
+                <p v-if="polygonAreaDiffM2 !== null" class="rounded-lg bg-black/20 px-3 py-2" :class="Math.abs(polygonAreaDiffM2) < 50 ? 'text-emerald-100/85' : 'text-amber-200/95'">
+                  Selisih estimasi: {{ polygonAreaDiffM2 >= 0 ? '+' : '' }}{{ formatAreaM2(polygonAreaDiffM2) }} M²
+                </p>
                 <p class="rounded-lg bg-black/20 px-3 py-2">Kepemilikan: {{ selectedLand?.kepemilikan || '-' }}</p>
                 <p class="rounded-lg bg-black/20 px-3 py-2">Elevasi: {{ selectedLand?.elevasi ?? '-' }} mdpl</p>
                 <p class="rounded-lg bg-black/20 px-3 py-2">Wilayah: {{ selectedLand?.kabupaten_kota || '-' }}, {{ selectedLand?.kecamatan || '-' }}</p>
-                <p class="rounded-lg bg-black/20 px-3 py-2">Titik Koordinat: {{ selectedLand?.koordinat?.length ?? 0 }}</p>
+                <p class="rounded-lg bg-black/20 px-3 py-2">Titik Koordinat: {{ orderedCoordinates.length }}</p>
               </div>
 
               <a
