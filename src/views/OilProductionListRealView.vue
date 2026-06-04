@@ -364,6 +364,8 @@ const exportCsv = () => {
     'berat_kering_bahan',
     'hasil_minyak_target',
     'hasil_minyak_aktual',
+    'tempat_penyulingan',
+    'harga_penyulingan_per_kg',
     'redaman',
   ]
   const rows = items.value.map((item) => [
@@ -380,6 +382,8 @@ const exportCsv = () => {
     item.berat_kering_bahan ?? '',
     item.hasil_minyak ?? '',
     item.aktual_hasil_minyak ?? '',
+    item.tempat_penyulingan ?? '',
+    item.harga_penyulingan_per_kg ?? '',
     item.redaman ?? '',
   ])
 
@@ -482,6 +486,8 @@ const exportCsv = () => {
           <p class="rounded-lg bg-black/20 px-3 py-2">Akhir: {{ item.tanggal_akhir || '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Berat Kering: {{ fmtNumber(item.berat_kering_bahan ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Hasil Minyak: {{ fmtNumber(item.aktual_hasil_minyak ?? item.hasil_minyak ?? 0) }} kg</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Tempat: {{ item.tempat_penyulingan || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Harga Penyulingan: {{ item.harga_penyulingan_per_kg != null ? `Rp ${fmtNumber(item.harga_penyulingan_per_kg)}` : '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2 sm:col-span-2">Redaman: {{ item.redaman != null ? Number(item.redaman).toFixed(3) : '-' }}</p>
         </div>
 
@@ -548,6 +554,8 @@ const exportCsv = () => {
           <p class="rounded-lg bg-black/20 px-3 py-2">Berat Kering: {{ fmtNumber(selectedItem.berat_kering_bahan ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Hasil (target): {{ fmtNumber(selectedItem.hasil_minyak ?? 0) }} kg</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Hasil (aktual): {{ fmtNumber(selectedItem.aktual_hasil_minyak ?? 0) }} kg</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Tempat Penyulingan: {{ selectedItem.tempat_penyulingan || '-' }}</p>
+          <p class="rounded-lg bg-black/20 px-3 py-2">Harga Penyulingan/Kg: {{ selectedItem.harga_penyulingan_per_kg != null ? `Rp ${fmtNumber(selectedItem.harga_penyulingan_per_kg)}` : '-' }}</p>
           <p class="rounded-lg bg-black/20 px-3 py-2">Redaman: {{ selectedItem.redaman != null ? Number(selectedItem.redaman).toFixed(3) : '-' }}</p>
         </div>
       </div>

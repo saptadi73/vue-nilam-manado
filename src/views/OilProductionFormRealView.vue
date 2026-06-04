@@ -34,6 +34,8 @@ const form = ref({
   berat_kering_bahan: '',
   hasil_minyak: '',
   aktual_hasil_minyak: '',
+  tempat_penyulingan: '',
+  harga_penyulingan_per_kg: '',
   status: 'rencana',
   petani_id: String(route.query.petani_id ?? ''),
   lahan_id: '',
@@ -87,6 +89,8 @@ const loadProductionDetail = async () => {
     berat_kering_bahan: detail?.berat_kering_bahan ?? '',
     hasil_minyak: detail?.hasil_minyak ?? '',
     aktual_hasil_minyak: detail?.aktual_hasil_minyak ?? '',
+    tempat_penyulingan: detail?.tempat_penyulingan ?? '',
+    harga_penyulingan_per_kg: detail?.harga_penyulingan_per_kg ?? '',
     status: detail?.status ?? 'rencana',
     petani_id: detail?.petani_id ?? '',
     lahan_id: detail?.lahan_id ?? '',
@@ -172,7 +176,12 @@ const validateForm = () => {
     return 'Aktual tanggal akhir tidak boleh lebih kecil dari tanggal mulai.'
   }
 
-  const numericOptionalFields = ['berat_kering_bahan', 'hasil_minyak', 'aktual_hasil_minyak']
+  const tempatPenyulingan = String(form.value.tempat_penyulingan ?? '').trim()
+  if (tempatPenyulingan.length > 255) {
+    return 'Tempat penyulingan maksimal 255 karakter.'
+  }
+
+  const numericOptionalFields = ['berat_kering_bahan', 'hasil_minyak', 'aktual_hasil_minyak', 'harga_penyulingan_per_kg']
   for (const field of numericOptionalFields) {
     const raw = String(form.value[field] ?? '').trim()
     if (!raw) continue
@@ -213,11 +222,19 @@ const submitForm = async () => {
       petani_id: form.value.petani_id,
     }
 
-    const optionalFields = ['tanggal_akhir', 'aktual_tanggal_akhir', 'berat_kering_bahan', 'hasil_minyak', 'aktual_hasil_minyak']
+    const optionalFields = [
+      'tanggal_akhir',
+      'aktual_tanggal_akhir',
+      'berat_kering_bahan',
+      'hasil_minyak',
+      'aktual_hasil_minyak',
+      'tempat_penyulingan',
+      'harga_penyulingan_per_kg',
+    ]
     optionalFields.forEach((field) => {
       const value = form.value[field]
       if (String(value ?? '').trim() === '') return
-      const numericFields = ['berat_kering_bahan', 'hasil_minyak', 'aktual_hasil_minyak']
+      const numericFields = ['berat_kering_bahan', 'hasil_minyak', 'aktual_hasil_minyak', 'harga_penyulingan_per_kg']
       if (numericFields.includes(field)) {
         const numericValue = Number(value)
         if (Number.isFinite(numericValue)) payload[field] = numericValue
@@ -306,6 +323,16 @@ onMounted(init)
         <label class="space-y-1 text-sm text-emerald-100/85">
           <span>Aktual Hasil Minyak</span>
           <input v-model="form.aktual_hasil_minyak" class="field w-full" type="number" min="0" step="0.01" />
+        </label>
+
+        <label class="space-y-1 text-sm text-emerald-100/85">
+          <span>Tempat Penyulingan</span>
+          <input v-model="form.tempat_penyulingan" class="field w-full" type="text" maxlength="255" placeholder="Contoh: Penyulingan Airmadidi" />
+        </label>
+
+        <label class="space-y-1 text-sm text-emerald-100/85">
+          <span>Harga Penyulingan per Kg</span>
+          <input v-model="form.harga_penyulingan_per_kg" class="field w-full" type="number" min="0" step="0.01" placeholder="15000" />
         </label>
 
         <label class="space-y-1 text-sm text-emerald-100/85">
