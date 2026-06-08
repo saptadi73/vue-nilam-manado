@@ -42,6 +42,14 @@ const navItems = computed(() => [
       { label: 'Produk Biaya', to: '/real/produk-biaya' },
     ],
   },
+  {
+    key: 'transaksi',
+    label: 'Transaksi',
+    children: [
+      { label: 'Penjualan', to: '/real/penjualan' },
+      { label: 'Pembiayaan', to: '/real/pembiayaan' },
+    ],
+  },
   { key: 'dashboard', label: 'Dashboard', to: '/real/dashboard' },
   {
     key: 'user',

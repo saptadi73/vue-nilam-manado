@@ -42,6 +42,8 @@ const router = createRouter({
     },
     { path: '/real/wilayah', name: 'wilayah-real', component: () => import('@/views/RegionMasterRealView.vue'), meta: { requiresAuth: true } },
     { path: '/real/profile', name: 'real-profile', component: () => import('@/views/RealProfileView.vue'), meta: { requiresAuth: true } },
+    { path: '/real/penjualan', name: 'sales-real-list', component: () => import('@/views/SalesListRealView.vue'), meta: { requiresAuth: true } },
+    { path: '/real/pembiayaan', name: 'financing-real-list', component: () => import('@/views/ExpenseListRealView.vue'), meta: { requiresAuth: true } },
     { path: '/real/expense', name: 'expense-real-list', component: () => import('@/views/ExpenseListRealView.vue'), meta: { requiresAuth: true } },
     { path: '/real/mitra', name: 'partner-real-list', component: () => import('@/views/PartnerListRealView.vue'), meta: { requiresAuth: true } },
     {

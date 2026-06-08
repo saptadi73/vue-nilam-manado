@@ -188,6 +188,22 @@ export const realErpService = {
     return request(`/sales-products/${id}`, { method: 'DELETE', query: withUserUpdateQuery() })
   },
 
+  async getSales(query = {}) {
+    return request('/sales', { query })
+  },
+  async getSaleById(id) {
+    return request(`/sales/${id}`)
+  },
+  async createSale(payload) {
+    return request('/sales', { method: 'POST', body: withUserUpdateId(payload) })
+  },
+  async updateSale(id, payload) {
+    return request(`/sales/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
+  },
+  async deleteSale(id) {
+    return request(`/sales/${id}`, { method: 'DELETE', query: withUserUpdateQuery() })
+  },
+
   async getPartners(query = {}) {
     return request('/partners', { query })
   },
