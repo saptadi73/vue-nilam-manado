@@ -36,6 +36,7 @@ const currentPage = ref(1)
 
 const formOpen = ref(false)
 const formError = ref('')
+const useDefaultPrice = ref(true)
 const form = ref({
   id: '',
   nama: '',
@@ -54,6 +55,53 @@ const totalPages = computed(() => Math.max(1, Math.ceil(items.value.length / pag
 const paginatedItems = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   return items.value.slice(start, start + pageSize.value)
+})
+
+const activeFilterChips = computed(() => {
+  const chips = []
+  const search = String(searchTerm.value ?? '').trim()
+
+  if (search) chips.push(`Cari: ${search}`)
+
+  if (sellerFilter.value) {
+    const farmer = farmers.value.find((item) => item.id === sellerFilter.value)
+    chips.push(`Penjual: ${farmer?.nama || 'Dipilih'}`)
+  }
+
+  if (buyerFilter.value) {
+    const partner = partners.value.find((item) => item.id === buyerFilter.value)
+    chips.push(`Pembeli: ${partner?.nama || 'Dipilih'}`)
+  }
+
+  if (productFilter.value) {
+    const product = products.value.find((item) => item.id === productFilter.value)
+    chips.push(`Produk: ${product?.nama || 'Dipilih'}`)
+  }
+
+  if (startDateFilter.value || endDateFilter.value) {
+    chips.push(`Periode: ${startDateFilter.value || '...'} s/d ${endDateFilter.value || '...'}`)
+  }
+
+  return chips
+})
+
+const selectedProductDefaultPrice = computed(() => {
+  const id = String(form.value.produk_penjualan_id ?? '').trim()
+  if (!id) return 0
+  const product = products.value.find((item) => item.id === id)
+  return Number(product?.harga ?? 0)
+})
+
+const isAutoPriceActive = computed(() => {
+  const isCreateMode = !form.value.id
+  const selectedProductId = String(form.value.produk_penjualan_id ?? '').trim()
+  const currentPrice = Number(form.value.harga)
+
+  if (!isCreateMode) return false
+  if (!selectedProductId) return false
+  if (selectedProductDefaultPrice.value <= 0) return false
+
+  return currentPrice === selectedProductDefaultPrice.value
 })
 
 watch([() => items.value.length, pageSize], () => {
@@ -133,6 +181,7 @@ const refreshAll = async () => {
 }
 
 const resetForm = () => {
+  useDefaultPrice.value = true
   form.value = {
     id: '',
     nama: '',
@@ -153,6 +202,7 @@ const openCreateForm = () => {
 }
 
 const openEditForm = (item) => {
+  useDefaultPrice.value = false
   form.value = {
     id: item.id,
     nama: item.nama ?? '',
@@ -281,6 +331,25 @@ watch([sellerFilter, buyerFilter, productFilter, startDateFilter, endDateFilter]
   await loadItems()
 })
 
+watch(
+  () => form.value.produk_penjualan_id,
+  () => {
+    const isCreateMode = !form.value.id
+    const currentPrice = Number(form.value.harga)
+    const shouldUseDefault = useDefaultPrice.value && isCreateMode && (!Number.isFinite(currentPrice) || currentPrice <= 0)
+    if (!shouldUseDefault) return
+    if (selectedProductDefaultPrice.value <= 0) return
+    form.value.harga = selectedProductDefaultPrice.value
+  },
+)
+
+watch(useDefaultPrice, (enabled) => {
+  if (!enabled) return
+  if (form.value.id) return
+  if (selectedProductDefaultPrice.value <= 0) return
+  form.value.harga = selectedProductDefaultPrice.value
+})
+
 onMounted(refreshAll)
 </script>
 
@@ -326,6 +395,16 @@ onMounted(refreshAll)
       </div>
     </DataToolbar>
 
+    <div v-if="activeFilterChips.length" class="flex flex-wrap gap-2">
+      <span
+        v-for="chip in activeFilterChips"
+        :key="chip"
+        class="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs text-emerald-100/90"
+      >
+        {{ chip }}
+      </span>
+    </div>
+
     <div class="grid gap-4 md:grid-cols-3">
       <article class="rounded-2xl border border-white/10 bg-white/4 p-4">
         <p class="text-xs uppercase tracking-widest text-emerald-100/70">Total Data</p>
@@ -360,46 +439,80 @@ onMounted(refreshAll)
       @action="loadItems"
     />
 
-    <div v-else class="overflow-auto rounded-2xl border border-white/10 bg-black/20 p-2">
-      <table class="w-full min-w-220 text-left text-sm text-emerald-50/90">
-        <thead class="text-emerald-100">
-          <tr>
-            <th class="p-2">Tanggal</th>
-            <th class="p-2">Nama Penjualan</th>
-            <th class="p-2">Penjual</th>
-            <th class="p-2">Pembeli</th>
-            <th class="p-2">Produk</th>
-            <th class="p-2">Harga</th>
-            <th class="p-2">Qty</th>
-            <th class="p-2">Sub Total</th>
-            <th class="p-2">Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in paginatedItems" :key="item.id" class="border-t border-white/10">
-            <td class="p-2">{{ item.tanggal }}</td>
-            <td class="p-2">{{ item.nama }}</td>
-            <td class="p-2">{{ item.penjual?.nama || '-' }}</td>
-            <td class="p-2">{{ item.pembeli?.nama || '-' }}</td>
-            <td class="p-2">{{ item.produk_penjualan?.nama || '-' }}</td>
-            <td class="p-2">{{ fmtCurrency(Number(item.harga ?? 0)) }}</td>
-            <td class="p-2">{{ fmtNumber(Number(item.quantity ?? 0)) }}</td>
-            <td class="p-2">{{ fmtCurrency(Number(item.sub_total ?? 0)) }}</td>
-            <td class="p-2">
-              <div class="flex flex-wrap gap-2">
-                <ActionButton @click="openEditForm(item)">Edit</ActionButton>
-                <ActionButton
-                  variant="danger"
-                  :disabled="deletingId === item.id"
-                  @click="deleteItem(item)"
-                >
-                  {{ deletingId === item.id ? 'Menghapus...' : 'Hapus' }}
-                </ActionButton>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else class="space-y-3">
+      <div class="space-y-3 md:hidden">
+        <article v-for="item in paginatedItems" :key="`mobile-sale-${item.id}`" class="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-white">{{ item.nama }}</p>
+              <p class="text-xs text-emerald-100/75">{{ item.tanggal }}</p>
+            </div>
+            <p class="text-sm font-semibold text-emerald-100">{{ fmtCurrency(Number(item.sub_total ?? 0)) }}</p>
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-emerald-100/85">
+            <p><span class="text-emerald-100/60">Penjual:</span> {{ item.penjual?.nama || '-' }}</p>
+            <p><span class="text-emerald-100/60">Pembeli:</span> {{ item.pembeli?.nama || '-' }}</p>
+            <p><span class="text-emerald-100/60">Produk:</span> {{ item.produk_penjualan?.nama || '-' }}</p>
+            <p><span class="text-emerald-100/60">Qty:</span> {{ fmtNumber(Number(item.quantity ?? 0)) }}</p>
+            <p class="col-span-2"><span class="text-emerald-100/60">Harga:</span> {{ fmtCurrency(Number(item.harga ?? 0)) }}</p>
+          </div>
+
+          <div class="mt-3 flex flex-col gap-2">
+            <ActionButton full-width @click="openEditForm(item)">Edit</ActionButton>
+            <ActionButton
+              variant="danger"
+              full-width
+              :disabled="deletingId === item.id"
+              @click="deleteItem(item)"
+            >
+              {{ deletingId === item.id ? 'Menghapus...' : 'Hapus' }}
+            </ActionButton>
+          </div>
+        </article>
+      </div>
+
+      <div class="hidden overflow-auto rounded-2xl border border-white/10 bg-black/20 p-2 md:block">
+        <table class="w-full min-w-220 text-left text-sm text-emerald-50/90">
+          <thead class="text-emerald-100">
+            <tr>
+              <th class="p-2">Tanggal</th>
+              <th class="p-2">Nama Penjualan</th>
+              <th class="p-2">Penjual</th>
+              <th class="p-2">Pembeli</th>
+              <th class="p-2">Produk</th>
+              <th class="p-2">Harga</th>
+              <th class="p-2">Qty</th>
+              <th class="p-2">Sub Total</th>
+              <th class="p-2">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in paginatedItems" :key="item.id" class="border-t border-white/10">
+              <td class="p-2">{{ item.tanggal }}</td>
+              <td class="p-2">{{ item.nama }}</td>
+              <td class="p-2">{{ item.penjual?.nama || '-' }}</td>
+              <td class="p-2">{{ item.pembeli?.nama || '-' }}</td>
+              <td class="p-2">{{ item.produk_penjualan?.nama || '-' }}</td>
+              <td class="p-2">{{ fmtCurrency(Number(item.harga ?? 0)) }}</td>
+              <td class="p-2">{{ fmtNumber(Number(item.quantity ?? 0)) }}</td>
+              <td class="p-2">{{ fmtCurrency(Number(item.sub_total ?? 0)) }}</td>
+              <td class="p-2">
+                <div class="flex flex-wrap gap-2">
+                  <ActionButton @click="openEditForm(item)">Edit</ActionButton>
+                  <ActionButton
+                    variant="danger"
+                    :disabled="deletingId === item.id"
+                    @click="deleteItem(item)"
+                  >
+                    {{ deletingId === item.id ? 'Menghapus...' : 'Hapus' }}
+                  </ActionButton>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <PaginationBar
@@ -412,7 +525,7 @@ onMounted(refreshAll)
     />
 
     <div v-if="formOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" @click="onOverlayClose">
-      <div class="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0a2f29] p-5">
+      <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-[#0a2f29] p-5">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-white">{{ form.id ? 'Edit Penjualan' : 'Tambah Penjualan' }}</h3>
           <ActionButton variant="muted" @click="closeForm">Tutup</ActionButton>
@@ -441,14 +554,25 @@ onMounted(refreshAll)
             <option v-for="product in products" :key="product.id" :value="product.id">{{ product.nama }}</option>
           </select>
 
-          <input v-model.number="form.harga" class="field" type="number" min="0" step="1" placeholder="Harga" required />
+          <label class="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-emerald-100/85">
+            <input v-model="useDefaultPrice" :disabled="Boolean(form.id)" type="checkbox" class="h-4 w-4" />
+            Pakai harga default produk
+          </label>
+
+          <div>
+            <input v-model.number="form.harga" class="field w-full" type="number" min="0" step="1" placeholder="Harga" required />
+            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-emerald-100/70">
+              <span>Harga default produk: {{ fmtCurrency(selectedProductDefaultPrice) }}</span>
+              <span v-if="isAutoPriceActive" class="rounded-full border border-emerald-300/35 bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-50">Auto harga aktif</span>
+            </div>
+          </div>
           <input v-model.number="form.quantity" class="field" type="number" min="1" step="1" placeholder="Quantity" required />
 
           <textarea v-model="form.deskripsi" class="field md:col-span-2" rows="3" placeholder="Deskripsi (opsional)" />
 
-          <div class="md:col-span-2 flex justify-end gap-2">
-            <ActionButton variant="muted" @click="closeForm">Batal</ActionButton>
-            <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
+          <div class="md:col-span-2 sticky bottom-0 -mx-2 flex flex-col-reverse justify-end gap-2 border-t border-white/10 bg-[#0a2f29] px-2 pt-3 sm:-mx-3 sm:flex-row sm:px-3">
+            <ActionButton variant="muted" full-width @click="closeForm">Batal</ActionButton>
+            <button type="submit" class="btn-primary w-full sm:w-auto" :disabled="saving">{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
           </div>
         </form>
       </div>
