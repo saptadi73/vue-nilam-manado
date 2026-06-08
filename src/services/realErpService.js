@@ -2,6 +2,7 @@ import { clearAccessToken, getAccessToken, getLoggedInUserId, markSessionExpired
 import { appConfig } from '@/config/env'
 
 const API_BASE_URL = appConfig.apiBaseUrl
+const API_FALLBACK_BASE_URL = String(appConfig.apiFallbackBaseUrl ?? '').trim()
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const isUuid = (value) => UUID_REGEX.test(String(value ?? '').trim())
@@ -50,14 +51,35 @@ const toAbsoluteUrl = (urlOrPath) => {
   return `${API_BASE_URL}${normalized}`
 }
 
-const buildUrl = (path, query = {}) => {
+const isAbsoluteHttpUrl = (value) => /^https?:\/\//i.test(String(value ?? '').trim())
+
+const buildUrl = (path, query = {}, baseUrl = API_BASE_URL) => {
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
-  const url = new URL(`${API_BASE_URL}${path}`, baseOrigin)
+  const normalizedBase = String(baseUrl ?? '').trim()
+  const url = new URL(`${normalizedBase}${path}`, baseOrigin)
   Object.entries(query).forEach(([key, value]) => {
     if (value === undefined || value === null || value === '') return
     url.searchParams.set(key, value)
   })
   return url.toString()
+}
+
+const buildRequestUrls = (path, query = {}) => {
+  const urls = [buildUrl(path, query, API_BASE_URL)]
+
+  if (API_FALLBACK_BASE_URL) {
+    urls.push(buildUrl(path, query, API_FALLBACK_BASE_URL))
+  }
+
+  // If the primary API is cross-origin, retry via same-origin /api for servers with reverse proxy.
+  if (typeof window !== 'undefined' && isAbsoluteHttpUrl(API_BASE_URL)) {
+    const primaryOrigin = new URL(API_BASE_URL).origin
+    if (primaryOrigin !== window.location.origin) {
+      urls.push(buildUrl(path, query, '/api'))
+    }
+  }
+
+  return [...new Set(urls)]
 }
 
 const withUserUpdate = (payload) => {
@@ -97,27 +119,7 @@ const withUserUpdateQuery = (query = {}) => {
   }
 }
 
-const request = async (path, options = {}) => {
-  const { query, body, isFormData = false, headers = {}, ...rest } = options
-  const token = getAccessToken()
-  const isStringBody = typeof body === 'string'
-
-  const response = await fetch(buildUrl(path, query), {
-    ...rest,
-    headers: {
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body
-      ? isFormData
-        ? body
-        : isStringBody
-          ? body
-          : JSON.stringify(body)
-      : undefined,
-  })
-
+const parseApiResponse = async (response, token) => {
   const rawText = await response.text()
   let payload = null
   if (rawText) {
@@ -140,6 +142,48 @@ const request = async (path, options = {}) => {
   }
 
   return unwrapData(payload)
+}
+
+const request = async (path, options = {}) => {
+  const { query, body, isFormData = false, headers = {}, ...rest } = options
+  const token = getAccessToken()
+  const isStringBody = typeof body === 'string'
+
+  const fetchOptions = {
+    ...rest,
+    headers: {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: body
+      ? isFormData
+        ? body
+        : isStringBody
+          ? body
+          : JSON.stringify(body)
+      : undefined,
+  }
+
+  const requestUrls = buildRequestUrls(path, query)
+  let lastError = null
+
+  for (let index = 0; index < requestUrls.length; index += 1) {
+    try {
+      const response = await fetch(requestUrls[index], fetchOptions)
+      return await parseApiResponse(response, token)
+    } catch (error) {
+      lastError = error
+      const isNetworkLikeError = error instanceof TypeError
+      const hasNextCandidate = index < requestUrls.length - 1
+
+      if (!isNetworkLikeError || !hasNextCandidate) {
+        throw error
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Gagal menghubungi server.')
 }
 
 export const realErpService = {
