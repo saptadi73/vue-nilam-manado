@@ -435,6 +435,27 @@ export const realErpService = {
     return request('/farmers', { method: 'POST', body: withUserUpdateId(payload) })
   },
 
+  async createFarmerWithPhoto(payload, file) {
+    const formData = new FormData()
+    const payloadWithUser = withUserUpdateId(payload)
+
+    Object.entries(payloadWithUser).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, value)
+      }
+    })
+
+    if (file) {
+      formData.append('foto', file)
+    }
+
+    return request('/farmers/with-foto', {
+      method: 'POST',
+      body: formData,
+      isFormData: true,
+    })
+  },
+
   async updateFarmer(id, payload) {
     return request(`/farmers/${id}`, { method: 'PUT', body: withUserUpdateId(payload) })
   },

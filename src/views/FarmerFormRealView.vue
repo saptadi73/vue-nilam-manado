@@ -24,6 +24,8 @@ const router = useRouter()
 const toast = useToast()
 
 const defaultPhoto = appConfig.defaultFarmerPhotoUrl
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
 
 const form = ref({
   nama: '',
@@ -149,9 +151,23 @@ const onPickPhoto = (event) => {
     pickedPhotoUrl.value = ''
   }
 
-  photoFile.value = file ?? null
+  photoFile.value = null
 
   if (!file) return
+
+  if (!IMAGE_MIME_TYPES.includes(file.type)) {
+    event.target.value = ''
+    toast.error('Format foto petani harus JPG, PNG, atau WEBP.')
+    return
+  }
+
+  if (file.size > MAX_PHOTO_SIZE_BYTES) {
+    event.target.value = ''
+    toast.error('Ukuran foto petani maksimal 5 MB.')
+    return
+  }
+
+  photoFile.value = file
 
   // Prefer Data URL to ensure preview renders consistently across environments.
   if (typeof FileReader !== 'undefined') {
@@ -281,13 +297,14 @@ const submitForm = async () => {
     let saved = null
 
     if (props.mode === 'create') {
-      saved = await realErpService.createFarmer(payload)
+      saved = photoFile.value
+        ? await realErpService.createFarmerWithPhoto(payload, photoFile.value)
+        : await realErpService.createFarmer(payload)
     } else {
       saved = await realErpService.updateFarmer(props.id, payload)
-    }
-
-    if (photoFile.value && saved?.id) {
-      await realErpService.uploadFarmerPhoto(saved.id, photoFile.value)
+      if (photoFile.value && saved?.id) {
+        await realErpService.uploadFarmerPhoto(saved.id, photoFile.value)
+      }
     }
 
     toast.success(props.mode === 'create' ? 'Data petani berhasil ditambahkan.' : 'Data petani berhasil diperbarui.')
@@ -390,6 +407,7 @@ onUnmounted(() => {
           <span>Foto Petani (opsional)</span>
           <input class="field w-full" type="file" accept="image/png,image/jpeg,image/webp" @change="onPickPhoto" />
           <p v-if="photoFile" class="text-xs text-emerald-100/70">File dipilih: {{ photoFile.name }}</p>
+          <p class="text-xs text-emerald-100/60">Format JPG, PNG, atau WEBP. Maksimal 5 MB.</p>
         </label>
 
         <div class="md:col-span-2">
