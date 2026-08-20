@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Pencil, Plus, RefreshCw, Trash2 } from '@lucide/vue'
 import ActionButton from '@/components/ActionButton.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import ListLoadingState from '@/components/ListLoadingState.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import PageState from '@/components/PageState.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { useToast } from '@/composables/useToast'
@@ -18,6 +20,8 @@ const error = ref('')
 const deletingId = ref('')
 const searchTerm = ref('')
 const items = ref([])
+const currentPage = ref(1)
+const pageSize = ref(10)
 
 let searchTimer = null
 
@@ -30,6 +34,25 @@ const filteredItems = computed(() => {
     return source.includes(keyword)
   })
 })
+
+const totalItems = computed(() => filteredItems.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / pageSize.value)))
+const pageStart = computed(() => (currentPage.value - 1) * pageSize.value)
+const pageEnd = computed(() => Math.min(pageStart.value + pageSize.value, totalItems.value))
+const paginatedItems = computed(() => filteredItems.value.slice(pageStart.value, pageEnd.value))
+
+const goToPrevPage = () => {
+  if (currentPage.value > 1) currentPage.value -= 1
+}
+
+const goToNextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value += 1
+}
+
+const updatePageSize = (value) => {
+  pageSize.value = value
+  currentPage.value = 1
+}
 
 const loadItems = async () => {
   loading.value = true
@@ -73,7 +96,12 @@ const deleteItem = async (item) => {
 
 watch(searchTerm, () => {
   clearTimeout(searchTimer)
+  currentPage.value = 1
   searchTimer = setTimeout(loadItems, 300)
+})
+
+watch(totalItems, () => {
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
 })
 
 onMounted(loadItems)
@@ -89,8 +117,14 @@ onMounted(loadItems)
 
     <DataToolbar content-class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <input v-model="searchTerm" class="field w-full" type="text" placeholder="Cari nama/satuan/deskripsi..." />
-      <ActionButton full-width @click="goToCreate">Tambah Produk Expense</ActionButton>
-      <ActionButton variant="muted" full-width @click="loadItems">Refresh</ActionButton>
+      <ActionButton full-width @click="goToCreate">
+        <Plus :size="16" aria-hidden="true" />
+        Tambah Produk Expense
+      </ActionButton>
+      <ActionButton variant="muted" full-width @click="loadItems">
+        <RefreshCw :size="16" aria-hidden="true" />
+        Refresh
+      </ActionButton>
     </DataToolbar>
 
     <ListLoadingState v-if="loading" variant="table" :row-count="5" :column-count="5" />
@@ -124,20 +158,24 @@ onMounted(loadItems)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredItems" :key="item.id" class="border-t border-white/10">
+          <tr v-for="item in paginatedItems" :key="item.id" class="border-t border-white/10">
             <td class="p-2 font-semibold">{{ item.nama }}</td>
             <td class="p-2">{{ fmtCurrency(Number(item.harga ?? 0)) }}</td>
             <td class="p-2">{{ item.satuan || '-' }}</td>
             <td class="p-2">{{ item.deskripsi || '-' }}</td>
             <td class="p-2">
-              <div class="flex flex-wrap gap-2">
-                <ActionButton @click="goToEdit(item.id)">Edit</ActionButton>
+              <div class="flex flex-nowrap gap-2">
+                <ActionButton @click="goToEdit(item.id)">
+                  <Pencil :size="16" aria-hidden="true" />
+                  Edit
+                </ActionButton>
                 <ActionButton
                   variant="danger"
                   :disabled="deletingId === item.id"
                   @click="deleteItem(item)"
                 >
-                  {{ deletingId === item.id ? 'Menghapus...' : 'Hapus' }}
+                  <Trash2 :size="16" aria-hidden="true" />
+                  {{ deletingId === item.id ? '...' : 'Hapus' }}
                 </ActionButton>
               </div>
             </td>
@@ -145,5 +183,18 @@ onMounted(loadItems)
         </tbody>
       </table>
     </div>
+
+    <PaginationBar
+      v-if="filteredItems.length"
+      :summary="`Menampilkan ${pageStart + 1}-${pageEnd} dari ${totalItems} produk`"
+      :page="currentPage"
+      :total-pages="totalPages"
+      :page-size="pageSize"
+      :page-size-options="[5, 10, 20]"
+      show-page-size
+      @prev="goToPrevPage"
+      @next="goToNextPage"
+      @update:page-size="updatePageSize"
+    />
   </section>
 </template>

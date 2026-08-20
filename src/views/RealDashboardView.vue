@@ -17,16 +17,10 @@ const filters = reactive({
   petani_id: '',
 })
 
-const salesMonthly = ref([])
-const expensesMonthly = ref([])
 const plantingMonthly = ref([])
 const oilMonthly = ref([])
-const salesByFarmer = ref([])
 const salesByFarmerRegency = ref([])
-const salesMonthlyByFarmer = ref([])
-const expensesMonthlyByFarmer = ref([])
 const salesVsExpensesMonthly = ref([])
-const salesVsExpensesByFarmer = ref([])
 const farmerNetProfit = ref([])
 
 const fmtPercent = (value) => `${Number(value ?? 0).toFixed(2)}%`
@@ -49,43 +43,25 @@ const fetchDashboard = async () => {
 
     const [
       farmersRes,
-      salesMonthlyRes,
-      expensesMonthlyRes,
       plantingMonthlyRes,
       oilMonthlyRes,
-      salesByFarmerRes,
       salesByFarmerRegencyRes,
-      salesMonthlyByFarmerRes,
-      expensesMonthlyByFarmerRes,
       salesVsExpensesMonthlyRes,
-      salesVsExpensesByFarmerRes,
       farmerNetProfitRes,
     ] = await Promise.all([
       realErpService.getFarmers(),
-      realErpService.getDashboardSalesMonthly(farmerQuery),
-      realErpService.getDashboardExpensesMonthly(farmerQuery),
       realErpService.getDashboardPlantingProductionsMonthly(farmerQuery),
       realErpService.getDashboardOilProductionsMonthly(farmerQuery),
-      realErpService.getDashboardSalesByFarmer(sharedQuery),
       realErpService.getDashboardSalesByFarmerRegency(sharedQuery),
-      realErpService.getDashboardSalesMonthlyByFarmer(farmerQuery),
-      realErpService.getDashboardExpensesMonthlyByFarmer(farmerQuery),
       realErpService.getDashboardSalesVsExpensesMonthly(farmerQuery),
-      realErpService.getDashboardSalesVsExpensesByFarmer(sharedQuery),
       realErpService.getDashboardFarmerNetProfit(sharedQuery),
     ])
 
     farmers.value = Array.isArray(farmersRes) ? farmersRes : []
-    salesMonthly.value = Array.isArray(salesMonthlyRes) ? salesMonthlyRes : []
-    expensesMonthly.value = Array.isArray(expensesMonthlyRes) ? expensesMonthlyRes : []
     plantingMonthly.value = Array.isArray(plantingMonthlyRes) ? plantingMonthlyRes : []
     oilMonthly.value = Array.isArray(oilMonthlyRes) ? oilMonthlyRes : []
-    salesByFarmer.value = Array.isArray(salesByFarmerRes) ? salesByFarmerRes : []
     salesByFarmerRegency.value = Array.isArray(salesByFarmerRegencyRes) ? salesByFarmerRegencyRes : []
-    salesMonthlyByFarmer.value = Array.isArray(salesMonthlyByFarmerRes) ? salesMonthlyByFarmerRes : []
-    expensesMonthlyByFarmer.value = Array.isArray(expensesMonthlyByFarmerRes) ? expensesMonthlyByFarmerRes : []
     salesVsExpensesMonthly.value = Array.isArray(salesVsExpensesMonthlyRes) ? salesVsExpensesMonthlyRes : []
-    salesVsExpensesByFarmer.value = Array.isArray(salesVsExpensesByFarmerRes) ? salesVsExpensesByFarmerRes : []
     farmerNetProfit.value = Array.isArray(farmerNetProfitRes) ? farmerNetProfitRes : []
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Gagal memuat dashboard real API.'
@@ -105,7 +81,10 @@ onMounted(fetchDashboard)
 
 const monthLabels = computed(() => salesVsExpensesMonthly.value.map((item) => item.bulan))
 
-const totalSales = computed(() => salesVsExpensesMonthly.value.reduce((acc, item) => acc + Number(item?.total_penjualan ?? 0), 0))
+const totalSalesMonthly = computed(() => salesVsExpensesMonthly.value.reduce((acc, item) => acc + Number(item?.total_penjualan ?? 0), 0))
+const totalSalesByRegency = computed(() => salesByFarmerRegency.value.reduce((acc, item) => acc + Number(item?.total_penjualan ?? 0), 0))
+const totalSales = computed(() => (filters.petani_id ? totalSalesMonthly.value : totalSalesByRegency.value))
+const totalSalesSubtitle = computed(() => (filters.petani_id ? 'Agregat petani terpilih' : 'Agregat per kabupaten'))
 const totalExpenses = computed(() => salesVsExpensesMonthly.value.reduce((acc, item) => acc + Number(item?.total_expense ?? 0), 0))
 const totalNetProfit = computed(() => salesVsExpensesMonthly.value.reduce((acc, item) => acc + Number(item?.net_profit ?? 0), 0))
 
@@ -167,22 +146,25 @@ const regencyPieChartOptions = computed(() => ({
 
 const regencyPieChartSeries = computed(() => salesByFarmerRegency.value.map((item) => Number(item?.total_penjualan ?? 0)))
 
-const farmerSalesBarOptions = computed(() => ({
+const regencySalesBarOptions = computed(() => ({
   chart: { type: 'bar', toolbar: { show: false }, foreColor: '#d1f7ea' },
-  plotOptions: { bar: { horizontal: true, borderRadius: 6 } },
+  plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '58%' } },
   xaxis: {
-    categories: salesByFarmer.value.map((item) => item?.petani?.nama || 'Tanpa Nama'),
+    categories: salesByFarmerRegency.value.map((item) => item.kabupaten_kota || item.kabupaten_kota_kode || 'Tanpa Wilayah'),
     labels: { formatter: (value) => fmtNumber(value) },
   },
+  yaxis: { labels: { maxWidth: 180 } },
+  dataLabels: { enabled: false },
+  tooltip: { y: { formatter: (value) => fmtCurrency(value) } },
   grid: { borderColor: 'rgba(255, 255, 255, 0.1)' },
   theme: { mode: 'dark' },
   colors: ['#22c55e'],
 }))
 
-const farmerSalesBarSeries = computed(() => [
+const regencySalesBarSeries = computed(() => [
   {
     name: 'Total Penjualan',
-    data: salesByFarmer.value.map((item) => Number(item?.total_penjualan ?? 0)),
+    data: salesByFarmerRegency.value.map((item) => Number(item?.total_penjualan ?? 0)),
   },
 ])
 
@@ -207,19 +189,6 @@ const productionTrendSeries = computed(() => [
   },
 ])
 
-const endpointCoverage = computed(() => [
-  { endpoint: '/dashboard/sales/monthly', rows: salesMonthly.value.length },
-  { endpoint: '/dashboard/expenses/monthly', rows: expensesMonthly.value.length },
-  { endpoint: '/dashboard/planting-productions/monthly', rows: plantingMonthly.value.length },
-  { endpoint: '/dashboard/oil-productions/monthly', rows: oilMonthly.value.length },
-  { endpoint: '/dashboard/sales/by-farmer', rows: salesByFarmer.value.length },
-  { endpoint: '/dashboard/sales/by-farmer-regency', rows: salesByFarmerRegency.value.length },
-  { endpoint: '/dashboard/sales/monthly-by-farmer', rows: salesMonthlyByFarmer.value.length },
-  { endpoint: '/dashboard/expenses/monthly-by-farmer', rows: expensesMonthlyByFarmer.value.length },
-  { endpoint: '/dashboard/sales-vs-expenses/monthly', rows: salesVsExpensesMonthly.value.length },
-  { endpoint: '/dashboard/sales-vs-expenses/by-farmer', rows: salesVsExpensesByFarmer.value.length },
-  { endpoint: '/dashboard/farmer-net-profit', rows: farmerNetProfit.value.length },
-])
 </script>
 
 <template>
@@ -253,7 +222,7 @@ const endpointCoverage = computed(() => [
 
     <template v-else>
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard title="Total Penjualan" :value="fmtCurrency(totalSales)" subtitle="Agregat bulanan" />
+        <MetricCard title="Total Penjualan" :value="fmtCurrency(totalSales)" :subtitle="totalSalesSubtitle" />
         <MetricCard title="Total Expense" :value="fmtCurrency(totalExpenses)" subtitle="Agregat bulanan" />
         <MetricCard title="Net Profit" :value="fmtCurrency(totalNetProfit)" subtitle="Penjualan - Expense" />
         <MetricCard title="Produksi Tanam" :value="fmtNumber(totalPlantingProductions)" subtitle="Jumlah batch" />
@@ -271,8 +240,8 @@ const endpointCoverage = computed(() => [
       </div>
 
       <div class="grid gap-4 xl:grid-cols-2">
-        <GlassPanel title="Total Penjualan per Petani (Bar Chart)" tight>
-          <ApexChartSafe type="bar" height="320" :options="farmerSalesBarOptions" :series="farmerSalesBarSeries" />
+        <GlassPanel title="Total Penjualan Petani per Kabupaten (Bar Chart)" tight>
+          <ApexChartSafe type="bar" height="320" :options="regencySalesBarOptions" :series="regencySalesBarSeries" />
         </GlassPanel>
 
         <GlassPanel title="Tren Produksi Tanam vs Minyak (Line Chart)" tight>
@@ -280,39 +249,28 @@ const endpointCoverage = computed(() => [
         </GlassPanel>
       </div>
 
-      <div class="grid gap-4 xl:grid-cols-2">
-        <GlassPanel title="Ranking Net Profit Petani" tight>
-          <div class="overflow-auto">
-            <table class="w-full min-w-155 text-left text-sm text-emerald-50/90">
-              <thead class="text-emerald-100">
-                <tr>
-                  <th class="pb-2">Petani</th>
-                  <th class="pb-2">Penjualan</th>
-                  <th class="pb-2">Expense</th>
-                  <th class="pb-2">Net Profit</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in farmerNetProfit" :key="row?.petani?.id || row?.petani?.nama" class="border-t border-white/10">
-                  <td class="py-3">{{ row?.petani?.nama || 'Tanpa Nama' }}</td>
-                  <td>{{ fmtCurrency(Number(row?.total_penjualan ?? 0)) }}</td>
-                  <td>{{ fmtCurrency(Number(row?.total_expense ?? 0)) }}</td>
-                  <td>{{ fmtCurrency(Number(row?.net_profit ?? 0)) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </GlassPanel>
-
-        <GlassPanel title="Coverage Endpoint Dashboard" tight>
-          <ul class="space-y-2 text-sm text-emerald-50/90">
-            <li v-for="row in endpointCoverage" :key="row.endpoint" class="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2">
-              <span class="truncate pr-3">{{ row.endpoint }}</span>
-              <strong>{{ fmtNumber(row.rows) }} rows</strong>
-            </li>
-          </ul>
-        </GlassPanel>
-      </div>
+      <GlassPanel title="Ranking Net Profit Petani" tight>
+        <div class="overflow-auto">
+          <table class="w-full min-w-155 text-left text-sm text-emerald-50/90">
+            <thead class="text-emerald-100">
+              <tr>
+                <th class="pb-2">Petani</th>
+                <th class="pb-2">Penjualan</th>
+                <th class="pb-2">Expense</th>
+                <th class="pb-2">Net Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in farmerNetProfit" :key="row?.petani?.id || row?.petani?.nama" class="border-t border-white/10">
+                <td class="py-3">{{ row?.petani?.nama || 'Tanpa Nama' }}</td>
+                <td>{{ fmtCurrency(Number(row?.total_penjualan ?? 0)) }}</td>
+                <td>{{ fmtCurrency(Number(row?.total_expense ?? 0)) }}</td>
+                <td>{{ fmtCurrency(Number(row?.net_profit ?? 0)) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </GlassPanel>
 
       <GlassPanel title="Distribusi Penjualan per Kabupaten" tight>
         <div class="overflow-auto">

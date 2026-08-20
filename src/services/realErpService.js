@@ -544,6 +544,10 @@ export const realErpService = {
     return request('/dashboard/sales/by-farmer-regency', { query })
   },
 
+  async getDashboardFarmerSummary(farmerId, query = {}) {
+    return request(`/dashboard/farmers/${farmerId}/summary`, { query })
+  },
+
   async getDashboardSalesMonthlyByFarmer(query = {}) {
     return request('/dashboard/sales/monthly-by-farmer', { query })
   },

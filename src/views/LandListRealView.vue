@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Eye, Pencil, Plus, RefreshCw, Search, Trash2 } from '@lucide/vue'
 import ActionButton from '@/components/ActionButton.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
@@ -131,9 +132,18 @@ onMounted(loadLands)
         placeholder="Cari kode lahan, pemilik, kab/kota, atau kecamatan..."
         @keyup.enter="loadLands"
       />
-      <ActionButton variant="muted" @click="loadLands">Search</ActionButton>
-      <ActionButton variant="muted" @click="loadLands">Refresh</ActionButton>
-      <ActionButton variant="primary" @click="goToCreate">Tambah Lahan</ActionButton>
+      <ActionButton variant="muted" @click="loadLands">
+        <Search :size="16" aria-hidden="true" />
+        Cari
+      </ActionButton>
+      <ActionButton variant="muted" @click="loadLands">
+        <RefreshCw :size="16" aria-hidden="true" />
+        Refresh
+      </ActionButton>
+      <ActionButton variant="primary" @click="goToCreate">
+        <Plus :size="16" aria-hidden="true" />
+        Tambah Lahan
+      </ActionButton>
     </DataToolbar>
 
     <ListLoadingState v-if="loading" :card-count="6" />
@@ -156,9 +166,9 @@ onMounted(loadLands)
     />
 
     <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <article v-for="land in paginatedLands" :key="land.id" class="rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
+      <article v-for="land in paginatedLands" :key="land.id" class="flex h-full min-w-0 flex-col rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
         <div class="space-y-2">
-          <p class="text-xs text-emerald-100/75">ID: {{ land.id }}</p>
+          <p class="break-all text-xs text-emerald-100/75">ID: {{ land.id }}</p>
           <h3 class="text-lg font-bold text-white">{{ land.kode }}</h3>
           <p class="text-sm text-emerald-100/85">Pemilik: {{ land.pemilik_nama || '-' }}</p>
         </div>
@@ -172,16 +182,23 @@ onMounted(loadLands)
           <p class="rounded-lg bg-black/20 px-3 py-2">Desa: {{ land.desa_kelurahan || '-' }}</p>
         </div>
 
-        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <ActionButton full-width @click="goToDetail(land.id)">Detail</ActionButton>
-          <ActionButton full-width @click="goToEdit(land.id)">Edit</ActionButton>
+        <div class="mt-auto grid grid-cols-3 gap-2 border-t border-white/10 pt-4">
+          <ActionButton class="w-full justify-center px-2" @click="goToDetail(land.id)">
+            <Eye :size="16" aria-hidden="true" />
+            Detail
+          </ActionButton>
+          <ActionButton class="w-full justify-center px-2" @click="goToEdit(land.id)">
+            <Pencil :size="16" aria-hidden="true" />
+            Edit
+          </ActionButton>
           <ActionButton
+            class="w-full justify-center px-2"
             variant="danger"
-            full-width
             :disabled="deletingId === land.id"
             @click="deleteLand(land)"
           >
-            {{ deletingId === land.id ? 'Menghapus...' : 'Hapus' }}
+            <Trash2 :size="16" aria-hidden="true" />
+            {{ deletingId === land.id ? '...' : 'Hapus' }}
           </ActionButton>
         </div>
       </article>

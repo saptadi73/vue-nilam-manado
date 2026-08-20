@@ -1,6 +1,18 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  Droplets,
+  Eye,
+  List,
+  MapPinned,
+  Pencil,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  Sprout,
+  Trash2,
+} from '@lucide/vue'
 import ActionButton from '@/components/ActionButton.vue'
 import { appConfig } from '@/config/env'
 import FarmerLandModalReal from '@/components/FarmerLandModalReal.vue'
@@ -8,6 +20,7 @@ import SectionHeader from '@/components/SectionHeader.vue'
 import FarmerExpenseModal from '@/components/FarmerExpenseModal.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import ListLoadingState from '@/components/ListLoadingState.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import PageState from '@/components/PageState.vue'
 import { realErpService, toAbsoluteUrl } from '@/services/realErpService'
 import { useToast } from '@/composables/useToast'
@@ -23,6 +36,8 @@ const loading = ref(false)
 const error = ref('')
 const deletingId = ref('')
 const searchTerm = ref('')
+const currentPage = ref(1)
+const pageSize = ref(6)
 const landModalOpen = ref(false)
 const selectedFarmerForLand = ref(null)
 const landsByFarmer = ref([])
@@ -64,6 +79,12 @@ const filteredFarmers = computed(() => {
   })
 })
 
+const totalItems = computed(() => filteredFarmers.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / pageSize.value)))
+const pageStart = computed(() => (currentPage.value - 1) * pageSize.value)
+const pageEnd = computed(() => Math.min(pageStart.value + pageSize.value, totalItems.value))
+const paginatedFarmers = computed(() => filteredFarmers.value.slice(pageStart.value, pageEnd.value))
+
 const getPhotoUrl = (farmer) => {
   if (!farmer?.foto_url) return defaultPhoto
   return toAbsoluteUrl(farmer.foto_url)
@@ -95,32 +116,6 @@ const getDateRangeParams = (rangeKey) => {
   }
 }
 
-const pickMetricDate = (row) => {
-  const value = row?.aktual_tanggal_akhir ?? row?.tanggal_akhir ?? row?.tanggal_mulai ?? row?.created_at ?? null
-  if (!value) return null
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-const isDateInRange = (dateValue, rangeKey) => {
-  if (rangeKey === 'all') return true
-  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return false
-
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  const start = new Date(end)
-  const dayMap = {
-    '30d': 30,
-    '90d': 90,
-    '365d': 365,
-  }
-  const days = dayMap[rangeKey] ?? 30
-  start.setDate(end.getDate() - (days - 1))
-  start.setHours(0, 0, 0, 0)
-
-  return dateValue >= start && dateValue <= end
-}
-
 const loadFarmers = async () => {
   loading.value = true
   error.value = ''
@@ -141,65 +136,24 @@ const loadFarmerMetrics = async (farmerList) => {
   metricLoading.value = true
   try {
     const dateRangeQuery = getDateRangeParams(metricRange.value)
-    const [salesExpenseRows, plantingRows, oilRows] = await Promise.all([
-      realErpService.getDashboardSalesVsExpensesByFarmer(dateRangeQuery),
-      realErpService.getPlantingProductions(),
-      realErpService.getOilProductions(),
-    ])
-
-    const salesExpenseMap = new Map()
-    ;(Array.isArray(salesExpenseRows) ? salesExpenseRows : []).forEach((row) => {
-      const farmerId = row?.petani?.id
-      if (!farmerId) return
-      salesExpenseMap.set(farmerId, {
-        totalPenjualan: Number(row?.total_penjualan ?? 0),
-        totalExpense: Number(row?.total_expense ?? 0),
-      })
-    })
-
-    const productionMap = new Map()
-    const pendingMap = new Map()
-    ;(Array.isArray(plantingRows) ? plantingRows : []).forEach((row) => {
-      const farmerId = row?.petani_id
-      if (!farmerId) return
-
-      if (String(row?.status ?? '').toLowerCase() !== 'selesai') {
-        const prevPending = pendingMap.get(farmerId) ?? { tanam: 0, minyak: 0 }
-        pendingMap.set(farmerId, { ...prevPending, tanam: prevPending.tanam + 1 })
-      }
-
-      if (!isDateInRange(pickMetricDate(row), metricRange.value)) return
-      const prev = productionMap.get(farmerId) ?? 0
-      const produksi = Number(row?.aktual_hasil_produksi_kering ?? row?.aktual_hasil_produksi_basah ?? row?.hasil_produksi_basah ?? 0)
-      productionMap.set(farmerId, prev + (Number.isFinite(produksi) ? produksi : 0))
-    })
-
-    ;(Array.isArray(oilRows) ? oilRows : []).forEach((row) => {
-      const farmerId = row?.petani_id
-      if (!farmerId) return
-
-      if (String(row?.status ?? '').toLowerCase() !== 'selesai') {
-        const prevPending = pendingMap.get(farmerId) ?? { tanam: 0, minyak: 0 }
-        pendingMap.set(farmerId, { ...prevPending, minyak: prevPending.minyak + 1 })
-      }
-
-      if (!isDateInRange(pickMetricDate(row), metricRange.value)) return
-      const prev = productionMap.get(farmerId) ?? 0
-      const produksi = Number(row?.aktual_hasil_minyak ?? row?.hasil_minyak ?? 0)
-      productionMap.set(farmerId, prev + (Number.isFinite(produksi) ? produksi : 0))
-    })
+    const summaries = await Promise.allSettled(
+      farmerList.map((farmer) => realErpService.getDashboardFarmerSummary(farmer.id, dateRangeQuery)),
+    )
 
     const nextMetrics = {}
     const nextPending = {}
-    ;(Array.isArray(farmerList) ? farmerList : []).forEach((farmer) => {
-      const salesExpense = salesExpenseMap.get(farmer.id) ?? { totalPenjualan: 0, totalExpense: 0 }
-      const pending = pendingMap.get(farmer.id) ?? { tanam: 0, minyak: 0 }
+    farmerList.forEach((farmer, index) => {
+      const result = summaries[index]
+      const summary = result?.status === 'fulfilled' ? result.value : {}
       nextMetrics[farmer.id] = {
-        totalPenjualan: salesExpense.totalPenjualan,
-        totalExpense: salesExpense.totalExpense,
-        totalProduksi: productionMap.get(farmer.id) ?? 0,
+        totalPenjualan: Number(summary.total_penjualan ?? 0),
+        totalProduksiMinyak: Number(summary.total_produksi_minyak ?? 0),
+        totalExpense: Number(summary.total_expense ?? 0),
       }
-      nextPending[farmer.id] = pending
+      nextPending[farmer.id] = {
+        tanam: Number(summary.jumlah_produksi_tanam_berjalan ?? 0),
+        minyak: Number(summary.jumlah_produksi_minyak_berjalan ?? 0),
+      }
     })
 
     farmerMetricsById.value = nextMetrics
@@ -208,7 +162,7 @@ const loadFarmerMetrics = async (farmerList) => {
     const nextMetrics = {}
     const nextPending = {}
     ;(Array.isArray(farmerList) ? farmerList : []).forEach((farmer) => {
-      nextMetrics[farmer.id] = { totalPenjualan: 0, totalExpense: 0, totalProduksi: 0 }
+      nextMetrics[farmer.id] = { totalPenjualan: 0, totalProduksiMinyak: 0, totalExpense: 0 }
       nextPending[farmer.id] = { tanam: 0, minyak: 0 }
     })
     farmerMetricsById.value = nextMetrics
@@ -218,7 +172,7 @@ const loadFarmerMetrics = async (farmerList) => {
   }
 }
 
-const metricFor = (farmerId) => farmerMetricsById.value[farmerId] ?? { totalPenjualan: 0, totalExpense: 0, totalProduksi: 0 }
+const metricFor = (farmerId) => farmerMetricsById.value[farmerId] ?? { totalPenjualan: 0, totalProduksiMinyak: 0, totalExpense: 0 }
 const pendingFor = (farmerId) => farmerPendingById.value[farmerId] ?? { tanam: 0, minyak: 0 }
 const hasPending = (farmerId) => {
   const pending = pendingFor(farmerId)
@@ -228,6 +182,29 @@ const hasPending = (farmerId) => {
 watch(metricRange, () => {
   loadFarmerMetrics(farmers.value)
 })
+
+watch(searchTerm, () => {
+  currentPage.value = 1
+})
+
+watch([totalItems, pageSize], () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+})
+
+const goToPrevPage = () => {
+  if (currentPage.value > 1) currentPage.value -= 1
+}
+
+const goToNextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value += 1
+}
+
+const updatePageSize = (value) => {
+  pageSize.value = value
+  currentPage.value = 1
+}
 
 const goToCreate = () => {
   router.push('/real/petani/new')
@@ -401,7 +378,7 @@ onMounted(loadFarmers)
 
     <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <article
-        v-for="farmer in filteredFarmers"
+        v-for="farmer in paginatedFarmers"
         :key="farmer.id"
         class="overflow-hidden rounded-2xl border bg-linear-to-br"
         :class="hasPending(farmer.id) ? 'border-amber-300/40 from-amber-300/10 to-emerald-200/5 shadow-[0_0_0_1px_rgba(252,211,77,0.2)]' : 'border-white/10 from-white/8 to-white/3'"
@@ -421,7 +398,10 @@ onMounted(loadFarmers)
             <p class="text-xs text-emerald-100/80">NIK: {{ farmer.nik }}</p>
             <h3 class="text-lg font-bold text-white">{{ farmer.nama }}</h3>
           </div>
-          <span class="absolute right-3 top-3 rounded-full bg-emerald-500/85 px-2 py-1 text-[11px] font-semibold text-[#06221d]">Lihat Lahan</span>
+          <span class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-[#06221d] shadow-lg shadow-black/20">
+            <MapPinned :size="13" aria-hidden="true" />
+            Lihat Lahan
+          </span>
         </div>
 
         <div class="space-y-4 p-3 sm:p-4">
@@ -445,9 +425,9 @@ onMounted(loadFarmers)
               </p>
             </div>
             <div class="rounded-lg border border-cyan-300/20 bg-cyan-500/10 px-3 py-2">
-              <p class="text-emerald-100/70">Total Produksi</p>
+              <p class="text-emerald-100/70">Total Produksi Minyak</p>
               <p class="mt-1 font-semibold text-cyan-50">
-                {{ metricLoading ? '...' : `${fmtNumber(metricFor(farmer.id).totalProduksi)} kg` }}
+                {{ metricLoading ? '...' : `${fmtNumber(metricFor(farmer.id).totalProduksiMinyak)} kg` }}
               </p>
             </div>
             <div class="rounded-lg border border-amber-300/20 bg-amber-500/10 px-3 py-2">
@@ -467,36 +447,96 @@ onMounted(loadFarmers)
             </span>
           </div>
 
-          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <ActionButton variant="primary" full-width @click="openLandModal(farmer)">Lihat Lahan</ActionButton>
-            <ActionButton full-width @click="goToAddLand(farmer.id)">Add Lahan</ActionButton>
-            <ActionButton full-width @click="goToPlantingProduction(farmer.id)">Produksi Tanam</ActionButton>
-            <ActionButton full-width @click="goToOilProduction(farmer.id)">Produksi Minyak</ActionButton>
-            <ActionButton full-width @click="goToPlantingProductionList(farmer.id)">List Tanam</ActionButton>
-            <ActionButton full-width @click="goToOilProductionList(farmer.id)">List Minyak</ActionButton>
-            <ActionButton
-              :variant="hasPending(farmer.id) ? 'primary' : 'neutral'"
-              full-width
-              :class="hasPending(farmer.id) ? 'animate-pulse' : ''"
-              @click="goToProductionUpdate(farmer.id)"
-            >
-              Update Produksi
-            </ActionButton>
-            <ActionButton full-width @click="openExpenseModal(farmer)">List Expense</ActionButton>
-            <ActionButton full-width @click="goToDetail(farmer.id)">Detail</ActionButton>
-            <ActionButton full-width @click="goToEdit(farmer.id)">Edit</ActionButton>
-            <ActionButton
-              variant="danger"
-              full-width
-              :disabled="deletingId === farmer.id"
-              @click="deleteFarmer(farmer)"
-            >
-              {{ deletingId === farmer.id ? 'Menghapus...' : 'Hapus' }}
-            </ActionButton>
+          <div class="space-y-4 border-t border-white/10 pt-4">
+            <div class="space-y-2">
+              <p class="text-[11px] font-semibold uppercase text-emerald-100/60">Lahan</p>
+              <div class="grid grid-cols-2 gap-2">
+                <ActionButton class="w-full justify-center" variant="primary" @click="openLandModal(farmer)">
+                  <MapPinned :size="16" aria-hidden="true" />
+                  Lihat Lahan
+                </ActionButton>
+                <ActionButton class="w-full justify-center" @click="goToAddLand(farmer.id)">
+                  <Plus :size="16" aria-hidden="true" />
+                  Tambah Lahan
+                </ActionButton>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-[11px] font-semibold uppercase text-emerald-100/60">Produksi</p>
+              <div class="grid grid-cols-2 gap-2">
+                <ActionButton class="w-full justify-center" @click="goToPlantingProduction(farmer.id)">
+                  <Sprout :size="16" aria-hidden="true" />
+                  Buat Tanam
+                </ActionButton>
+                <ActionButton class="w-full justify-center" @click="goToOilProduction(farmer.id)">
+                  <Droplets :size="16" aria-hidden="true" />
+                  Buat Minyak
+                </ActionButton>
+                <ActionButton class="w-full justify-center" @click="goToPlantingProductionList(farmer.id)">
+                  <List :size="16" aria-hidden="true" />
+                  Daftar Tanam
+                </ActionButton>
+                <ActionButton class="w-full justify-center" @click="goToOilProductionList(farmer.id)">
+                  <List :size="16" aria-hidden="true" />
+                  Daftar Minyak
+                </ActionButton>
+                <ActionButton
+                  class="col-span-2 w-full justify-center"
+                  :variant="hasPending(farmer.id) ? 'primary' : 'neutral'"
+                  @click="goToProductionUpdate(farmer.id)"
+                >
+                  <RefreshCw :size="16" aria-hidden="true" />
+                  Update Produksi
+                  <span v-if="hasPending(farmer.id)" class="rounded-full bg-black/20 px-2 py-0.5 text-[10px]">
+                    {{ pendingFor(farmer.id).tanam + pendingFor(farmer.id).minyak }} pending
+                  </span>
+                </ActionButton>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <ActionButton class="w-full justify-center" @click="openExpenseModal(farmer)">
+                <ReceiptText :size="16" aria-hidden="true" />
+                Daftar Expense
+              </ActionButton>
+              <div class="grid grid-cols-3 gap-2">
+                <ActionButton class="w-full justify-center px-2" @click="goToDetail(farmer.id)">
+                  <Eye :size="16" aria-hidden="true" />
+                  Detail
+                </ActionButton>
+                <ActionButton class="w-full justify-center px-2" @click="goToEdit(farmer.id)">
+                  <Pencil :size="16" aria-hidden="true" />
+                  Edit
+                </ActionButton>
+                <ActionButton
+                  class="w-full justify-center px-2"
+                  variant="danger"
+                  :disabled="deletingId === farmer.id"
+                  @click="deleteFarmer(farmer)"
+                >
+                  <Trash2 :size="16" aria-hidden="true" />
+                  {{ deletingId === farmer.id ? '...' : 'Hapus' }}
+                </ActionButton>
+              </div>
+            </div>
           </div>
         </div>
       </article>
     </div>
+
+    <PaginationBar
+      v-if="filteredFarmers.length"
+      :summary="`Menampilkan ${pageStart + 1}-${pageEnd} dari ${totalItems} petani`"
+      :page="currentPage"
+      :total-pages="totalPages"
+      :page-size="pageSize"
+      :page-size-options="[3, 6, 9, 12]"
+      show-page-size
+      @prev="goToPrevPage"
+      @next="goToNextPage"
+      @update:page-size="updatePageSize"
+    />
 
     <FarmerLandModalReal
       :open="landModalOpen"

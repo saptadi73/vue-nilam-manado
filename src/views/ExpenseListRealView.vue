@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from '@lucide/vue'
 import ActionButton from '@/components/ActionButton.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
@@ -381,9 +382,9 @@ onMounted(refreshAll)
       </select>
 
       <div class="flex flex-col gap-2 sm:flex-row xl:col-span-4">
-        <ActionButton variant="primary" full-width @click="openCreateForm">Tambah Pembiayaan</ActionButton>
-        <ActionButton variant="muted" full-width @click="loadItems">Refresh</ActionButton>
-        <ActionButton variant="muted" full-width @click="resetFilters">Reset Filter</ActionButton>
+        <ActionButton variant="primary" full-width @click="openCreateForm"><Plus :size="16" aria-hidden="true" /> Tambah Pembiayaan</ActionButton>
+        <ActionButton variant="muted" full-width @click="loadItems"><RefreshCw :size="16" aria-hidden="true" /> Refresh</ActionButton>
+        <ActionButton variant="muted" full-width @click="resetFilters"><RotateCcw :size="16" aria-hidden="true" /> Reset Filter</ActionButton>
       </div>
     </DataToolbar>
 
@@ -449,15 +450,16 @@ onMounted(refreshAll)
             <p><span class="text-emerald-100/60">Harga:</span> {{ fmtCurrency(Number(item.harga ?? 0)) }}</p>
           </div>
 
-          <div class="mt-3 flex flex-col gap-2">
-            <ActionButton full-width @click="openEditForm(item)">Edit</ActionButton>
+          <div class="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
+            <ActionButton class="w-full justify-center" @click="openEditForm(item)"><Pencil :size="16" aria-hidden="true" /> Edit</ActionButton>
             <ActionButton
+              class="w-full justify-center"
               variant="danger"
-              full-width
               :disabled="deletingId === item.id"
               @click="deleteItem(item)"
             >
-              {{ deletingId === item.id ? 'Menghapus...' : 'Hapus' }}
+              <Trash2 :size="16" aria-hidden="true" />
+              {{ deletingId === item.id ? '...' : 'Hapus' }}
             </ActionButton>
           </div>
         </article>
@@ -487,14 +489,15 @@ onMounted(refreshAll)
               <td class="p-2">{{ fmtNumber(Number(item.quantity ?? 0)) }}</td>
               <td class="p-2">{{ fmtCurrency(Number(item.sub_total ?? 0)) }}</td>
               <td class="p-2">
-                <div class="flex flex-wrap gap-2">
-                  <ActionButton @click="openEditForm(item)">Edit</ActionButton>
+                <div class="flex flex-nowrap gap-2">
+                  <ActionButton @click="openEditForm(item)"><Pencil :size="16" aria-hidden="true" /> Edit</ActionButton>
                   <ActionButton
                     variant="danger"
                     :disabled="deletingId === item.id"
                     @click="deleteItem(item)"
                   >
-                    {{ deletingId === item.id ? 'Menghapus...' : 'Hapus' }}
+                    <Trash2 :size="16" aria-hidden="true" />
+                    {{ deletingId === item.id ? '...' : 'Hapus' }}
                   </ActionButton>
                 </div>
               </td>

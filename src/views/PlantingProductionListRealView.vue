@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Download, Eye, FileText, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from '@lucide/vue'
 import ActionButton from '@/components/ActionButton.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
@@ -441,10 +442,10 @@ const exportCsv = () => {
       </select>
 
       <div class="flex flex-col gap-2 sm:flex-row xl:col-span-4">
-        <ActionButton variant="primary" full-width @click="refreshAll">Refresh</ActionButton>
-        <ActionButton variant="muted" full-width @click="resetFilters">Reset Filter</ActionButton>
-        <ActionButton variant="muted" full-width @click="exportCsv">Export CSV</ActionButton>
-        <ActionButton variant="muted" full-width @click="router.push('/real/produksi-tanam/new')">Tambah Produksi Tanam</ActionButton>
+        <ActionButton variant="primary" full-width @click="refreshAll"><RefreshCw :size="16" aria-hidden="true" /> Refresh</ActionButton>
+        <ActionButton variant="muted" full-width @click="resetFilters"><RotateCcw :size="16" aria-hidden="true" /> Reset Filter</ActionButton>
+        <ActionButton variant="muted" full-width @click="exportCsv"><Download :size="16" aria-hidden="true" /> Export CSV</ActionButton>
+        <ActionButton variant="muted" full-width @click="router.push('/real/produksi-tanam/new')"><Plus :size="16" aria-hidden="true" /> Tambah Produksi</ActionButton>
       </div>
     </DataToolbar>
 
@@ -477,14 +478,14 @@ const exportCsv = () => {
     />
 
     <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <article v-for="item in paginatedItems" :key="item.id" class="rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
+      <article v-for="item in paginatedItems" :key="item.id" class="flex h-full min-w-0 flex-col rounded-2xl border border-white/10 bg-linear-to-br from-white/8 to-white/3 p-4">
         <div class="space-y-2">
           <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-xs text-emerald-100/75">ID: {{ item.id }}</p>
+            <div class="min-w-0">
+              <p class="break-all text-xs text-emerald-100/75">ID: {{ item.id }}</p>
               <h3 class="text-lg font-bold text-white">{{ item.kode }}</h3>
             </div>
-            <span class="rounded-full px-2 py-1 text-xs font-semibold" :class="statusBadgeClass(item.status)">{{ item.status }}</span>
+            <span class="shrink-0 rounded-full px-2 py-1 text-xs font-semibold" :class="statusBadgeClass(item.status)">{{ item.status }}</span>
           </div>
           <p class="text-sm text-emerald-100/85">{{ cardSubtitle(item) }}</p>
         </div>
@@ -511,22 +512,17 @@ const exportCsv = () => {
           <p class="text-[11px] text-emerald-100/70">Perhitungan: tanggal mulai - hari ini - rencana selesai.</p>
         </div>
 
-        <div class="mt-4 flex flex-col gap-2 sm:flex-row">
-          <ActionButton full-width @click="openNoteModal(item)">
+        <div class="mt-auto grid grid-cols-2 gap-2 pt-4">
+          <ActionButton class="col-span-2 w-full justify-center" @click="openNoteModal(item)">
             <span class="inline-flex items-center gap-1">
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-                <path d="M14 3v6h6" />
-                <path d="M9 13h6" />
-                <path d="M9 17h6" />
-              </svg>
+              <FileText :size="16" aria-hidden="true" />
               Catatan
             </span>
           </ActionButton>
-          <ActionButton full-width @click="openQuickDetail(item)">Ringkas</ActionButton>
-          <ActionButton full-width @click="goToDetail(item.id)">Detail</ActionButton>
-          <ActionButton full-width @click="goToEdit(item.id)">Edit</ActionButton>
-          <ActionButton variant="danger" full-width @click="deleteItem(item)">Hapus</ActionButton>
+          <ActionButton class="w-full justify-center" @click="openQuickDetail(item)"><Eye :size="16" aria-hidden="true" /> Ringkas</ActionButton>
+          <ActionButton class="w-full justify-center" @click="goToDetail(item.id)"><FileText :size="16" aria-hidden="true" /> Detail</ActionButton>
+          <ActionButton class="w-full justify-center" @click="goToEdit(item.id)"><Pencil :size="16" aria-hidden="true" /> Edit</ActionButton>
+          <ActionButton class="w-full justify-center" variant="danger" @click="deleteItem(item)"><Trash2 :size="16" aria-hidden="true" /> Hapus</ActionButton>
         </div>
       </article>
     </div>

@@ -1,16 +1,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import SectionHeader from '@/components/SectionHeader.vue'
 import { useToast } from '@/composables/useToast'
 import { useAuthSession } from '@/services/authSession'
 import { realErpService } from '@/services/realErpService'
-import erpImage from '@/assets/images/erp.png'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
-const { isAuthenticated, setAccessToken, setUserEmail, setUserId, clearAccessToken } = useAuthSession()
+const { setAccessToken, setUserEmail, setUserId } = useAuthSession()
 
 const authMode = ref('login')
 const name = ref('')
@@ -20,37 +18,12 @@ const showPassword = ref(false)
 const loading = ref(false)
 const error = ref('')
 
-const featureItems = [
-  {
-    title: 'Master Data Terpusat',
-    description: 'Kelola petani, lahan, produksi tanam, produksi minyak, dan expense dari satu portal real API.',
-  },
-  {
-    title: 'Dashboard Agregat',
-    description: 'Pantau penjualan, expense, dan produktivitas petani dengan chart yang langsung mengambil data backend.',
-  },
-  {
-    title: 'Akses Cepat CRUD',
-    description: 'Setelah login, menu utama langsung menampilkan halaman list yang berisi tombol create, edit, detail, dan hapus.',
-  },
-]
-
-const registerBenefits = [
-  'Buat akun baru untuk mulai memakai Real API.',
-  'Registrasi tersedia langsung dari halaman awal tanpa pindah route.',
-  'Setelah akun dibuat, kamu bisa langsung login dan masuk ke dashboard real.',
-]
-
 const authTitle = computed(() => (authMode.value === 'register' ? 'Buat Akun Baru' : 'Masuk ke Portal Real API'))
 const authDescription = computed(() =>
   authMode.value === 'register'
     ? 'Lengkapi nama, email, dan password untuk registrasi akun baru.'
     : 'Masukkan email dan password akun yang sudah terdaftar untuk mengakses sistem.',
 )
-const switchPrompt = computed(() =>
-  authMode.value === 'register' ? 'Sudah punya akun?' : 'Belum punya akun?',
-)
-const switchLabel = computed(() => (authMode.value === 'register' ? 'Kembali ke Login' : 'Buka Register'))
 
 const trimmedName = computed(() => name.value.trim())
 const trimmedEmail = computed(() => email.value.trim())
@@ -191,11 +164,6 @@ const submitAuth = () => {
   return submitLogin()
 }
 
-const logout = () => {
-  clearAccessToken()
-  toast.info('Sesi real API diakhiri.')
-}
-
 const switchMode = (mode) => {
   authMode.value = mode
   error.value = ''
@@ -216,77 +184,9 @@ watch(
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl space-y-6">
-    <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-      <article class="overflow-hidden rounded-4xl border border-white/10 bg-linear-to-br from-emerald-500/20 via-cyan-500/10 to-black/20 p-6 sm:p-7 lg:p-8">
-        <div class="max-w-2xl space-y-6">
-          <SectionHeader
-            eyebrow="Portal Masuk"
-            title="ERP Nilam untuk Operasional Real API"
-            description="Halaman pertama aplikasi kini difokuskan untuk autentikasi, sehingga pengguna bisa login atau register sebelum masuk ke modul operasional."
-          />
-
-          <div class="grid gap-3 sm:grid-cols-3">
-            <article
-              v-for="item in featureItems"
-              :key="item.title"
-              class="rounded-2xl border border-white/10 bg-black/20 p-4"
-            >
-              <p class="text-sm font-semibold text-white">{{ item.title }}</p>
-              <p class="mt-2 text-xs leading-relaxed text-emerald-100/80">{{ item.description }}</p>
-            </article>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-            <div class="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-5">
-              <p class="text-xs uppercase tracking-[0.18em] text-emerald-100/70">Untuk Pengguna Baru</p>
-              <h3 class="mt-2 text-xl font-bold text-white">Register langsung dari halaman ini</h3>
-              <ul class="mt-4 space-y-3 text-sm text-emerald-50/85">
-                <li v-for="benefit in registerBenefits" :key="benefit" class="flex items-start gap-3">
-                  <span class="mt-1 inline-block h-2 w-2 rounded-full bg-emerald-300" />
-                  <span>{{ benefit }}</span>
-                </li>
-              </ul>
-              <button type="button" class="btn-primary mt-5 w-full sm:w-auto" @click="switchMode('register')">
-                Buka Form Register
-              </button>
-            </div>
-
-            <div class="rounded-2xl border border-white/10 bg-black/20 p-5">
-              <p class="text-xs uppercase tracking-[0.18em] text-emerald-100/70">Akses Setelah Login</p>
-              <div class="mt-4 space-y-3 text-sm text-emerald-50/85">
-                <div class="rounded-xl bg-white/6 px-4 py-3">1. Dashboard Real API</div>
-                <div class="rounded-xl bg-white/6 px-4 py-3">2. List Petani dan Lahan</div>
-                <div class="rounded-xl bg-white/6 px-4 py-3">3. List Produksi Tanam dan Minyak</div>
-                <div class="rounded-xl bg-white/6 px-4 py-3">4. List Expense dan menu pendukung</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="overflow-hidden rounded-3xl border border-white/10 bg-black/20 p-3">
-            <div class="relative overflow-hidden rounded-[1.4rem] bg-linear-to-br from-emerald-500/20 via-cyan-500/10 to-black/20 p-3">
-              <div class="absolute inset-0 bg-radial from-white/12 via-transparent to-transparent opacity-70" />
-              <img :src="erpImage" alt="ERP Patchouli Illustration" class="relative z-10 h-64 w-full rounded-[1.1rem] object-cover object-center" />
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <article class="rounded-4xl border border-white/10 bg-black/25 p-4 sm:p-5 lg:p-6">
-        <div v-if="isAuthenticated" class="space-y-4">
-          <div class="rounded-2xl border border-emerald-300/30 bg-emerald-500/10 p-5">
-            <p class="text-xs uppercase tracking-[0.16em] text-emerald-100/70">Sesi Aktif</p>
-            <h3 class="mt-2 text-xl font-bold text-white">Kamu sudah login ke Real API</h3>
-            <p class="mt-2 text-sm text-emerald-100/80">Lanjutkan ke dashboard untuk mengelola data operasional, produksi, dan expense.</p>
-          </div>
-
-          <div class="grid gap-2 sm:grid-cols-2">
-            <button type="button" class="btn-primary w-full" @click="router.push('/real/dashboard')">Buka Dashboard Real</button>
-            <button type="button" class="btn-muted w-full" @click="logout">Logout</button>
-          </div>
-        </div>
-
-        <div v-else class="space-y-5">
+  <section class="mx-auto flex max-w-lg items-center py-4 sm:min-h-[70vh]">
+    <article class="w-full rounded-4xl border border-white/10 bg-black/25 p-5 sm:p-7">
+        <div class="space-y-5">
           <div>
             <p class="text-xs uppercase tracking-[0.16em] text-emerald-100/70">Autentikasi</p>
             <h3 class="mt-2 text-2xl font-bold text-white">{{ authTitle }}</h3>
@@ -310,15 +210,6 @@ watch(
             >
               Register
             </button>
-          </div>
-
-          <div class="rounded-2xl border border-cyan-300/20 bg-cyan-500/10 p-4">
-            <p class="text-sm text-cyan-50/90">
-              {{ switchPrompt }}
-              <button type="button" class="ml-2 font-semibold text-cyan-200 underline underline-offset-4" @click="switchMode(authMode === 'register' ? 'login' : 'register')">
-                {{ switchLabel }}
-              </button>
-            </p>
           </div>
 
           <form class="space-y-4" @submit.prevent="submitAuth">
@@ -362,7 +253,6 @@ watch(
             </button>
           </form>
         </div>
-      </article>
-    </div>
+    </article>
   </section>
 </template>
