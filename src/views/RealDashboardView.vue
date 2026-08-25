@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import ApexChartSafe from '@/components/ApexChartSafe.vue'
 import SectionHeader from '@/components/SectionHeader.vue'
 import GlassPanel from '@/components/GlassPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import { realErpService } from '@/services/realErpService'
 import { fmtCurrency, fmtNumber } from '@/utils/formatters'
 
@@ -22,8 +23,46 @@ const oilMonthly = ref([])
 const salesByFarmerRegency = ref([])
 const salesVsExpensesMonthly = ref([])
 const farmerNetProfit = ref([])
+const rankingSearch = ref('')
+const rankingPage = ref(1)
+const rankingPageSize = ref(10)
 
 const fmtPercent = (value) => `${Number(value ?? 0).toFixed(2)}%`
+const normalizeText = (value) => String(value ?? '').toLowerCase().trim()
+
+const rankedFarmerNetProfit = computed(() => [...farmerNetProfit.value]
+  .sort((a, b) => Number(b?.net_profit ?? 0) - Number(a?.net_profit ?? 0))
+  .map((row, index) => ({ ...row, ranking: index + 1 })))
+
+const filteredFarmerNetProfit = computed(() => {
+  const keyword = normalizeText(rankingSearch.value)
+  if (!keyword) return rankedFarmerNetProfit.value
+
+  return rankedFarmerNetProfit.value.filter((row) => {
+    const farmer = row?.petani ?? {}
+    return [farmer.nama, farmer.nik, farmer.kabupaten_kota, farmer.kecamatan]
+      .some((value) => normalizeText(value).includes(keyword))
+  })
+})
+
+const rankingTotalItems = computed(() => filteredFarmerNetProfit.value.length)
+const rankingTotalPages = computed(() => Math.max(1, Math.ceil(rankingTotalItems.value / rankingPageSize.value)))
+const rankingPageStart = computed(() => (rankingPage.value - 1) * rankingPageSize.value)
+const rankingPageEnd = computed(() => Math.min(rankingPageStart.value + rankingPageSize.value, rankingTotalItems.value))
+const paginatedFarmerNetProfit = computed(() => filteredFarmerNetProfit.value.slice(rankingPageStart.value, rankingPageEnd.value))
+
+watch(rankingSearch, () => {
+  rankingPage.value = 1
+})
+
+watch([rankingTotalItems, rankingPageSize], () => {
+  if (rankingPage.value > rankingTotalPages.value) rankingPage.value = rankingTotalPages.value
+})
+
+const updateRankingPageSize = (value) => {
+  rankingPageSize.value = value
+  rankingPage.value = 1
+}
 
 const buildQuery = (includeFarmer = true) => {
   const query = {}
@@ -63,6 +102,7 @@ const fetchDashboard = async () => {
     salesByFarmerRegency.value = Array.isArray(salesByFarmerRegencyRes) ? salesByFarmerRegencyRes : []
     salesVsExpensesMonthly.value = Array.isArray(salesVsExpensesMonthlyRes) ? salesVsExpensesMonthlyRes : []
     farmerNetProfit.value = Array.isArray(farmerNetProfitRes) ? farmerNetProfitRes : []
+    rankingPage.value = 1
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Gagal memuat dashboard real API.'
   } finally {
@@ -250,10 +290,20 @@ const productionTrendSeries = computed(() => [
       </div>
 
       <GlassPanel title="Ranking Net Profit Petani" tight>
+        <div class="mb-4">
+          <input
+            v-model="rankingSearch"
+            type="search"
+            class="field w-full"
+            placeholder="Cari nama, NIK, kabupaten/kota, atau kecamatan petani..."
+            aria-label="Cari ranking profit petani"
+          />
+        </div>
         <div class="overflow-auto">
           <table class="w-full min-w-155 text-left text-sm text-emerald-50/90">
             <thead class="text-emerald-100">
               <tr>
+                <th class="pb-2 pr-3">Ranking</th>
                 <th class="pb-2">Petani</th>
                 <th class="pb-2">Penjualan</th>
                 <th class="pb-2">Expense</th>
@@ -261,15 +311,32 @@ const productionTrendSeries = computed(() => [
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in farmerNetProfit" :key="row?.petani?.id || row?.petani?.nama" class="border-t border-white/10">
+              <tr v-for="row in paginatedFarmerNetProfit" :key="row?.petani?.id || row?.petani?.nama" class="border-t border-white/10">
+                <td class="py-3 pr-3 font-semibold text-emerald-300">#{{ row.ranking }}</td>
                 <td class="py-3">{{ row?.petani?.nama || 'Tanpa Nama' }}</td>
                 <td>{{ fmtCurrency(Number(row?.total_penjualan ?? 0)) }}</td>
                 <td>{{ fmtCurrency(Number(row?.total_expense ?? 0)) }}</td>
                 <td>{{ fmtCurrency(Number(row?.net_profit ?? 0)) }}</td>
               </tr>
+              <tr v-if="!paginatedFarmerNetProfit.length">
+                <td colspan="5" class="py-8 text-center text-emerald-100/65">Petani tidak ditemukan.</td>
+              </tr>
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          v-if="rankingTotalItems"
+          class="mt-4"
+          :summary="`Menampilkan ${rankingPageStart + 1}-${rankingPageEnd} dari ${rankingTotalItems} petani`"
+          :page="rankingPage"
+          :total-pages="rankingTotalPages"
+          :page-size="rankingPageSize"
+          :page-size-options="[5, 10, 20, 50]"
+          show-page-size
+          @prev="rankingPage -= 1"
+          @next="rankingPage += 1"
+          @update:page-size="updateRankingPageSize"
+        />
       </GlassPanel>
 
       <GlassPanel title="Distribusi Penjualan per Kabupaten" tight>

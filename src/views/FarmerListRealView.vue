@@ -46,7 +46,6 @@ const landError = ref('')
 const farmerMetricsById = ref({})
 const metricLoading = ref(false)
 const farmerPendingById = ref({})
-const metricRange = ref('30d')
 
 const expenseModalOpen = ref(false)
 const selectedFarmerIdForExpense = ref(null)
@@ -59,13 +58,6 @@ function closeExpenseModal() {
   expenseModalOpen.value = false
   selectedFarmerIdForExpense.value = null
 }
-
-const metricRangeOptions = [
-  { value: '30d', label: '30 Hari' },
-  { value: '90d', label: '90 Hari' },
-  { value: '365d', label: '1 Tahun' },
-  { value: 'all', label: 'Semua Waktu' },
-]
 
 const normalizeText = (text) => String(text ?? '').toLowerCase().trim()
 
@@ -90,32 +82,6 @@ const getPhotoUrl = (farmer) => {
   return toAbsoluteUrl(farmer.foto_url)
 }
 
-const toIsoDate = (date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const getDateRangeParams = (rangeKey) => {
-  if (rangeKey === 'all') return {}
-
-  const end = new Date()
-  const start = new Date(end)
-  const dayMap = {
-    '30d': 30,
-    '90d': 90,
-    '365d': 365,
-  }
-  const days = dayMap[rangeKey] ?? 30
-  start.setDate(end.getDate() - (days - 1))
-
-  return {
-    tanggal_mulai: toIsoDate(start),
-    tanggal_akhir: toIsoDate(end),
-  }
-}
-
 const loadFarmers = async () => {
   loading.value = true
   error.value = ''
@@ -135,9 +101,8 @@ const loadFarmers = async () => {
 const loadFarmerMetrics = async (farmerList) => {
   metricLoading.value = true
   try {
-    const dateRangeQuery = getDateRangeParams(metricRange.value)
     const summaries = await Promise.allSettled(
-      farmerList.map((farmer) => realErpService.getDashboardFarmerSummary(farmer.id, dateRangeQuery)),
+      farmerList.map((farmer) => realErpService.getDashboardFarmerSummary(farmer.id)),
     )
 
     const nextMetrics = {}
@@ -149,6 +114,9 @@ const loadFarmerMetrics = async (farmerList) => {
         totalPenjualan: Number(summary.total_penjualan ?? 0),
         totalProduksiMinyak: Number(summary.total_produksi_minyak ?? 0),
         totalExpense: Number(summary.total_expense ?? 0),
+        rasioProduksiKeMinyak: summary.rasio_rata_rata_produksi_ke_minyak == null
+          ? null
+          : Number(summary.rasio_rata_rata_produksi_ke_minyak),
       }
       nextPending[farmer.id] = {
         tanam: Number(summary.jumlah_produksi_tanam_berjalan ?? 0),
@@ -162,7 +130,7 @@ const loadFarmerMetrics = async (farmerList) => {
     const nextMetrics = {}
     const nextPending = {}
     ;(Array.isArray(farmerList) ? farmerList : []).forEach((farmer) => {
-      nextMetrics[farmer.id] = { totalPenjualan: 0, totalProduksiMinyak: 0, totalExpense: 0 }
+      nextMetrics[farmer.id] = { totalPenjualan: 0, totalProduksiMinyak: 0, totalExpense: 0, rasioProduksiKeMinyak: null }
       nextPending[farmer.id] = { tanam: 0, minyak: 0 }
     })
     farmerMetricsById.value = nextMetrics
@@ -172,16 +140,16 @@ const loadFarmerMetrics = async (farmerList) => {
   }
 }
 
-const metricFor = (farmerId) => farmerMetricsById.value[farmerId] ?? { totalPenjualan: 0, totalProduksiMinyak: 0, totalExpense: 0 }
+const metricFor = (farmerId) => farmerMetricsById.value[farmerId] ?? { totalPenjualan: 0, totalProduksiMinyak: 0, totalExpense: 0, rasioProduksiKeMinyak: null }
+const fmtProductionRatio = (value) => {
+  if (value == null || !Number.isFinite(Number(value))) return '-'
+  return `${(Number(value) * 100).toFixed(2)}%`
+}
 const pendingFor = (farmerId) => farmerPendingById.value[farmerId] ?? { tanam: 0, minyak: 0 }
 const hasPending = (farmerId) => {
   const pending = pendingFor(farmerId)
   return pending.tanam + pending.minyak > 0
 }
-
-watch(metricRange, () => {
-  loadFarmerMetrics(farmers.value)
-})
 
 watch(searchTerm, () => {
   currentPage.value = 1
@@ -350,9 +318,6 @@ onMounted(loadFarmers)
         class="field min-w-64 flex-1"
         placeholder="Cari nama, kota/kabupaten, atau kecamatan..."
       />
-      <select v-model="metricRange" class="field w-full sm:w-auto" aria-label="Pilih periode metric petani">
-        <option v-for="option in metricRangeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
       <ActionButton variant="muted" @click="loadFarmers">Refresh</ActionButton>
       <ActionButton variant="primary" @click="goToCreate">Tambah Petani</ActionButton>
     </DataToolbar>
@@ -417,7 +382,7 @@ onMounted(loadFarmers)
             <p class="rounded-lg bg-black/20 px-3 py-2">Desa: {{ farmer.desa_kelurahan || '-' }}</p>
           </div>
 
-          <div class="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+          <div class="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
             <div class="rounded-lg border border-emerald-300/20 bg-emerald-500/10 px-3 py-2">
               <p class="text-emerald-100/70">Total Penjualan</p>
               <p class="mt-1 font-semibold text-emerald-50">
@@ -434,6 +399,12 @@ onMounted(loadFarmers)
               <p class="text-emerald-100/70">Total Expense</p>
               <p class="mt-1 font-semibold text-amber-50">
                 {{ metricLoading ? '...' : fmtCurrency(metricFor(farmer.id).totalExpense) }}
+              </p>
+            </div>
+            <div class="rounded-lg border border-violet-300/20 bg-violet-500/10 px-3 py-2">
+              <p class="text-emerald-100/70">Rasio Tanaman ke Minyak</p>
+              <p class="mt-1 font-semibold text-violet-50">
+                {{ metricLoading ? '...' : fmtProductionRatio(metricFor(farmer.id).rasioProduksiKeMinyak) }}
               </p>
             </div>
           </div>
