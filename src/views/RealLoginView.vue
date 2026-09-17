@@ -93,7 +93,7 @@ const submitLogin = async () => {
   loading.value = true
   error.value = ''
   try {
-    const auth = await realErpService.login(trimmedEmail.value, trimmedPassword.value)
+    const auth = await realErpService.login(trimmedEmail.value, password.value)
     const token = auth?.access_token ?? ''
 
     if (!token) {
