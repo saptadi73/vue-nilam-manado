@@ -7,7 +7,7 @@ import { useAuthSession } from '@/services/authSession'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { isAuthenticated, clearAccessToken } = useAuthSession()
+const { isAuthenticated, userRole, clearAccessToken } = useAuthSession()
 
 const mobileMenuOpen = ref(false)
 const desktopDropdownKey = ref('')
@@ -20,6 +20,7 @@ const navItems = computed(() => [
   {
     key: 'master',
     label: 'Master Data',
+    roles: ['ADMIN', 'OFFICER'],
     children: [
       { label: 'Petani', to: '/real/petani' },
       { label: 'Lahan', to: '/real/lahan' },
@@ -29,6 +30,7 @@ const navItems = computed(() => [
   {
     key: 'produksi',
     label: 'Produksi',
+    roles: ['ADMIN', 'OFFICER', 'USER'],
     children: [
       { label: 'Produksi Tanam', to: '/real/produksi-tanam' },
       { label: 'Produksi Minyak', to: '/real/produksi-minyak' },
@@ -37,6 +39,7 @@ const navItems = computed(() => [
   {
     key: 'produk',
     label: 'Produk',
+    roles: ['ADMIN', 'OFFICER'],
     children: [
       { label: 'Produk Penjualan', to: '/real/produk-penjualan' },
       { label: 'Produk Biaya', to: '/real/produk-biaya' },
@@ -45,19 +48,20 @@ const navItems = computed(() => [
   {
     key: 'transaksi',
     label: 'Transaksi',
+    roles: ['ADMIN'],
     children: [
       { label: 'Penjualan', to: '/real/penjualan' },
       { label: 'Pembiayaan', to: '/real/pembiayaan' },
     ],
   },
-  { key: 'dashboard', label: 'Dashboard', to: '/real/dashboard' },
+  { key: 'dashboard', label: 'Dashboard', to: '/real/dashboard', roles: ['ADMIN', 'OFFICER'] },
   {
     key: 'user',
     label: 'User',
     children: [
       { label: 'Login', to: '/real/login' },
       { label: 'Logout', action: 'logout', authOnly: true },
-      { label: 'Register', to: '/real/login?mode=register' },
+      { label: 'Registrasi User', to: '/real/register', roles: ['ADMIN'] },
       { label: 'Profil', to: '/real/profile', authOnly: true },
     ],
   },
@@ -67,9 +71,12 @@ const visibleChildren = (item) => {
   if (!item?.children) return []
   return item.children.filter((child) => {
     if (child.authOnly && !isAuthenticated.value) return false
+    if (child.roles && !child.roles.includes(userRole.value)) return false
     return true
   })
 }
+
+const isVisibleItem = (item) => !item.roles || item.roles.includes(userRole.value)
 
 const closeAllMenus = () => {
   mobileMenuOpen.value = false
@@ -146,7 +153,8 @@ watch(
       </div>
 
       <ul class="mt-3 hidden items-center gap-1 md:flex">
-        <li v-for="item in navItems" :key="`desktop-${item.key}`" class="relative">
+        <template v-for="item in navItems" :key="`desktop-${item.key}`">
+          <li v-if="isVisibleItem(item)" class="relative">
           <RouterLink
             v-if="item.to"
             :to="item.to"
@@ -191,12 +199,14 @@ watch(
               </button>
             </template>
           </div>
-        </li>
+          </li>
+        </template>
       </ul>
 
       <transition name="fade">
         <div v-if="mobileMenuOpen" class="mt-3 space-y-2 md:hidden">
           <template v-for="item in navItems" :key="`mobile-${item.key}`">
+            <template v-if="isVisibleItem(item)">
             <RouterLink
               v-if="item.to"
               :to="item.to"
@@ -231,6 +241,7 @@ watch(
                 </template>
               </div>
             </details>
+            </template>
           </template>
         </div>
       </transition>

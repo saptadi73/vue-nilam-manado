@@ -124,13 +124,18 @@ POST /auth/register
 POST /api/auth/register
 ```
 
+Registrasi dilakukan melalui halaman frontend terpisah `/real/register` dan
+hanya dapat dibuka oleh user dengan role `ADMIN`. Role yang tersedia adalah
+`ADMIN`, `OFFICER`, dan `USER`.
+
 Payload:
 
 ```json
 {
   "name": "Admin Nilam",
   "email": "admin@nilam.local",
-  "password": "password123"
+  "password": "password123",
+  "role": "OFFICER"
 }
 ```
 
@@ -144,7 +149,7 @@ Response `200 OK`:
     "id": "243b7917-8586-432e-9199-47bcedd8f2f9",
     "name": "Admin Nilam",
     "email": "admin@nilam.local",
-    "password": "$2b$12$..."
+    "role": "OFFICER"
   }
 }
 ```
@@ -193,6 +198,17 @@ Response `200 OK`:
 ```
 
 Simpan `access_token` di frontend untuk endpoint yang nanti membutuhkan auth.
+
+### Hak Akses Role
+
+| Role | Akses frontend |
+| --- | --- |
+| `ADMIN` | Registrasi user dan seluruh CRUD. |
+| `OFFICER` | Seluruh CRUD Master Data, Produksi Tanam, Produksi Minyak, dan Pembiayaan. Tidak dapat registrasi user. |
+| `USER` | Hanya input Produksi Tanam, Produksi Minyak, dan Pembiayaan. |
+
+Menu dan route frontend disaring berdasarkan role. Otorisasi backend tetap wajib
+diterapkan pada endpoint API.
 
 ## Master Wilayah GIS
 

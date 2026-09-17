@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { hasAccessToken } from '@/services/authSession'
+import { getUserRole, hasAccessToken } from '@/services/authSession'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -10,6 +10,7 @@ const router = createRouter({
     { path: '/demo/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
     { path: '/petani', name: 'petani', component: () => import('@/views/FarmerPerformanceView.vue') },
     { path: '/real/login', name: 'real-login', component: () => import('@/views/RealLoginView.vue') },
+    { path: '/real/register', name: 'real-register', component: () => import('@/views/RealRegisterView.vue'), meta: { requiresAuth: true, roles: ['ADMIN'] } },
     { path: '/real/dashboard', name: 'real-dashboard', component: () => import('@/views/RealDashboardView.vue'), meta: { requiresAuth: true } },
     { path: '/real/petani', name: 'petani-real', component: () => import('@/views/FarmerListRealView.vue'), meta: { requiresAuth: true } },
     {
@@ -153,6 +154,19 @@ const router = createRouter({
   ],
 })
 
+const roleAccessForPath = (path) => {
+  if (path === '/real/register') return ['ADMIN']
+  if (/^\/real\/(produksi-tanam|produksi-minyak|pembiayaan|expense)(\/|$)/.test(path)) {
+    return ['ADMIN', 'OFFICER', 'USER']
+  }
+  if (/^\/real\/(petani|lahan|wilayah|mitra|produk-biaya)(\/|$)/.test(path)) {
+    return ['ADMIN', 'OFFICER']
+  }
+  if (path === '/real/profile') return ['ADMIN', 'OFFICER', 'USER']
+  if (path === '/real/dashboard') return ['ADMIN', 'OFFICER']
+  return ['ADMIN']
+}
+
 router.beforeEach((to) => {
   if (to.meta.requiresAuth && !hasAccessToken()) {
     return {
@@ -163,6 +177,10 @@ router.beforeEach((to) => {
 
   if (to.name === 'real-login' && hasAccessToken()) {
     return { name: 'real-dashboard' }
+  }
+
+  if (to.meta.requiresAuth && !roleAccessForPath(to.path).includes(getUserRole())) {
+    return { path: getUserRole() === 'USER' ? '/real/produksi-tanam' : '/real/dashboard' }
   }
 
   return true
