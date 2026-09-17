@@ -1,4 +1,5 @@
 <script setup>
+import { Eye, EyeOff } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
@@ -9,6 +10,9 @@ const toast = useToast()
 const name = ref('')
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 const role = ref('USER')
 const loading = ref(false)
 const error = ref('')
@@ -18,6 +22,7 @@ const fieldErrors = computed(() => ({
   name: name.value.trim().length < 3 ? 'Nama minimal 3 karakter.' : '',
   email: !emailPattern.test(email.value.trim()) ? 'Format email belum valid.' : '',
   password: password.value.length < 8 ? 'Password minimal 8 karakter.' : '',
+  confirmPassword: confirmPassword.value !== password.value ? 'Konfirmasi password tidak sama.' : '',
 }))
 
 const hasErrors = computed(() => Object.values(fieldErrors.value).some(Boolean))
@@ -71,8 +76,37 @@ const submitRegister = async () => {
         </label>
         <label class="block space-y-1 text-sm text-emerald-100/85">
           <span>Password</span>
-          <input v-model="password" class="field w-full" type="password" placeholder="Minimal 8 karakter" required />
+          <div class="relative">
+            <input v-model="password" class="field w-full pr-12" :type="showPassword ? 'text' : 'password'" placeholder="Minimal 8 karakter" required />
+            <button
+              type="button"
+              class="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-emerald-100/75 transition hover:bg-white/8 hover:text-white"
+              :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+              :title="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+              @click="showPassword = !showPassword"
+            >
+              <EyeOff v-if="showPassword" :size="18" aria-hidden="true" />
+              <Eye v-else :size="18" aria-hidden="true" />
+            </button>
+          </div>
           <p v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</p>
+        </label>
+        <label class="block space-y-1 text-sm text-emerald-100/85">
+          <span>Konfirmasi Password</span>
+          <div class="relative">
+            <input v-model="confirmPassword" class="field w-full pr-12" :type="showConfirmPassword ? 'text' : 'password'" placeholder="Ulangi password" required />
+            <button
+              type="button"
+              class="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-emerald-100/75 transition hover:bg-white/8 hover:text-white"
+              :aria-label="showConfirmPassword ? 'Sembunyikan konfirmasi password' : 'Tampilkan konfirmasi password'"
+              :title="showConfirmPassword ? 'Sembunyikan konfirmasi password' : 'Tampilkan konfirmasi password'"
+              @click="showConfirmPassword = !showConfirmPassword"
+            >
+              <EyeOff v-if="showConfirmPassword" :size="18" aria-hidden="true" />
+              <Eye v-else :size="18" aria-hidden="true" />
+            </button>
+          </div>
+          <p v-if="fieldErrors.confirmPassword" class="field-error">{{ fieldErrors.confirmPassword }}</p>
         </label>
         <label class="block space-y-1 text-sm text-emerald-100/85">
           <span>Role</span>
